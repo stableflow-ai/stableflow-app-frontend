@@ -1,4 +1,7 @@
 import useWalletStore from "@/all-tokens/wallet-store";
+import useWalletsStore, { type WalletType } from "@/stores/use-wallets";
+import FieldAlert from "@/components/field-alert";
+import { isTemporarySwapLimitError } from "@/utils/quote-error";
 import { useSwitchChain } from "wagmi";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import Loading from "@/components/loading/icon";
@@ -35,6 +38,7 @@ type NetworksProps = {
 
 export default function Networks({ addressValidation, onRefreshQuote, isRoutes = false, onToggleRoutes }: NetworksProps) {
   const walletStore = useWalletStore();
+  const wallets = useWalletsStore();
   const bridgeStore = useBridgeStore();
   const { switchChainAsync } = useSwitchChain();
   const balancesStore = useBalancesStore();
@@ -98,6 +102,12 @@ export default function Networks({ addressValidation, onRefreshQuote, isRoutes =
     return _balance ? _balance : "0.00";
   }, [walletStore.fromToken, balancesStore]);
 
+  const fromWallet = walletStore.fromToken ? wallets[walletStore.fromToken.chainType as WalletType] : undefined;
+  const errorConnect = !!fromWallet && !fromWallet.account;
+  const showsFieldError = !errorConnect;
+  const swapLimitAlert = showsFieldError && isTemporarySwapLimitError(bridgeStore.errorTips);
+  const balanceAlert = showsFieldError && bridgeStore.errorTips === "Insufficient balance";
+
   useEffect(() => {
     return () => {
       if (timer.current) {
@@ -124,22 +134,25 @@ export default function Networks({ addressValidation, onRefreshQuote, isRoutes =
           }}
           token={walletStore.fromToken}
           disabled={!walletStore.fromToken}
+          valueAlert={swapLimitAlert}
           rightContent={(
             <div className="flex items-center justify-end gap-3.5">
               {
                 !!walletStore.fromToken && (
-                  <div className="flex items-center gap-1 text-xs text-[#9FA7BA] leading-[100%] font-['SpaceGrotesk] font-normal">
-                    <div className="">
-                      Balance:
+                  <FieldAlert active={balanceAlert} iconPosition="start">
+                    <div className="flex items-center gap-1 text-xs text-[#9FA7BA] leading-[100%] font-['SpaceGrotesk] font-normal">
+                      <div className="">
+                        Balance:
+                      </div>
+                      <div className="text-[#0E3616]">
+                        {
+                          balanceLoading ? (
+                            <Loading size={12} className="text-[#B3BBCE]" />
+                          ) : formatNumber(balance, 2, true, { round: Big.roundDown })
+                        }
+                      </div>
                     </div>
-                    <div className="text-[#0E3616]">
-                      {
-                        balanceLoading ? (
-                          <Loading size={12} className="text-[#B3BBCE]" />
-                        ) : formatNumber(balance, 2, true, { round: Big.roundDown })
-                      }
-                    </div>
-                  </div>
+                  </FieldAlert>
                 )
               }
               <div className="flex items-center gap-1.5">

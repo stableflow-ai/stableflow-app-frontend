@@ -33,6 +33,7 @@ import useEvmGasFeesStore from "@/stores/use-evm-gas-fees";
 import { ExecTime } from "@/utils/exec-time";
 import { useTrack } from "@/hooks/use-track";
 import { useAllTokensStore } from "@/all-tokens/store";
+import { formatTemporarySwapLimitMessage } from "@/utils/quote-error";
 
 const TRANSFER_MIN_AMOUNT = import.meta.env.VITE_TRANSFER_MIN_AMOUNT || 0.01;
 const CCTP_AUTO_REQUOTE_DURATION = 20000; // 20s
@@ -266,6 +267,8 @@ export default function useBridge(props?: any) {
         _finalReportErrorMessage = error.message;
         _errLevel = error.level;
       }
+
+      _finalErrorMessage = formatTemporarySwapLimitMessage(_finalErrorMessage);
 
       const _quoteData = {
         type: service,

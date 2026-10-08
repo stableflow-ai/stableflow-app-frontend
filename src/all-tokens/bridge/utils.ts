@@ -2,6 +2,7 @@ import type { TokenChain } from "@/all-tokens/chains";
 import type { WalletType } from "@/stores/use-wallets";
 import { evmRpcFallbackProvider } from "@/utils/evm-rpc-providers";
 import { csl } from "@/utils/log";
+import { formatTemporarySwapLimitMessage } from "@/utils/quote-error";
 import Big from "big.js";
 
 const RPC_REQUEST_LIMIT_ERROR_MESSAGE = "Request limit reached. Please try again later.";
@@ -172,6 +173,10 @@ export const formatBridgeRpcErrorMessage = (errorMessage: string) => {
 /** Parse Rhea multi-provider quote errors into short BridgeButton-friendly text. */
 export const formatRheaQuoteErrorMessage = (errorMessage: string, decimals = 6) => {
   const message = errorMessage || "Quote failed";
+  const swapLimitMessage = formatTemporarySwapLimitMessage(message);
+  if (swapLimitMessage !== message) {
+    return swapLimitMessage;
+  }
 
   const amountTooLowMatch = message.match(
     /Amount is too low for bridge,\s*try at least\s+(\d+(?:\.\d+)?)/i
