@@ -2,6 +2,7 @@ import axios from "axios";
 import { v4 as uuidV4 } from "uuid";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
+import { STABLECOIN_TRADE_TYPE } from "@/all-tokens/config";
 import { BASE_API_URL } from "@/config/api";
 import { csl } from "@/utils/log";
 
@@ -105,7 +106,7 @@ export const addTradeReport = (payload: Record<string, any>) => {
   const item: TradeReportItem = {
     id: uuidV4(),
     payload: {
-      type: 0,
+      type: STABLECOIN_TRADE_TYPE,
       ...payload,
     },
     createdAt: Date.now(),

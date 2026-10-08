@@ -14,7 +14,7 @@ import useWalletStore from "@/all-tokens/wallet-store";
 import useBridgeStore from "@/all-tokens/bridge-store";
 import useTokenBalance from "@/hooks/use-token-balance";
 import useToast from "@/hooks/use-toast";
-import { ALL_TOKENS_MIN_AMOUNT, BridgeDefaultWallets, PRICE_IMPACT_THRESHOLD } from "@/all-tokens/config";
+import { ALL_TOKENS_MIN_AMOUNT, ALL_TOKENS_TRADE_TYPE, BridgeDefaultWallets, PRICE_IMPACT_THRESHOLD } from "@/all-tokens/config";
 import { formatNumber } from "@/utils/format/number";
 import { Service, ServiceBackend } from "@/all-tokens/constants";
 import { useAccount, useSwitchChain } from "wagmi";
@@ -399,6 +399,7 @@ export default function useBridge(_props?: any) {
       const amountWei = toBaseUnits(bridgeStore.amount, fromToken.decimals);
 
       const reportBase: Record<string, any> = {
+        type: ALL_TOKENS_TRADE_TYPE,
         project: ServiceBackend[Service.Rhea],
         route: ServiceBackend[Service.Rhea],
         address: sender,
