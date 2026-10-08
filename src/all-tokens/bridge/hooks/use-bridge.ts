@@ -12,6 +12,7 @@ import { useHistoryStore } from "@/stores/use-history";
 import { useConfigStore } from "@/stores/use-config";
 import useWalletStore from "@/all-tokens/wallet-store";
 import useBridgeStore from "@/all-tokens/bridge-store";
+import useBalancesStore, { type BalancesState } from "@/stores/use-balances";
 import useTokenBalance from "@/hooks/use-token-balance";
 import useToast from "@/hooks/use-toast";
 import { ALL_TOKENS_MIN_AMOUNT, ALL_TOKENS_TRADE_TYPE, BridgeDefaultWallets, PRICE_IMPACT_THRESHOLD } from "@/all-tokens/config";
@@ -52,6 +53,7 @@ export default function useBridge(_props?: any) {
   const configStore = useConfigStore();
   const walletStore = useWalletStore();
   const bridgeStore = useBridgeStore();
+  const balancesStore = useBalancesStore();
   const { getBalance } = useTokenBalance(walletStore.fromToken, false);
   const evmAccount = useAccount();
   const { switchChainAsync } = useSwitchChain();
@@ -339,6 +341,50 @@ export default function useBridge(_props?: any) {
       setAmountError("Invalid amount");
     }
   }, [bridgeStore.amount, walletStore.fromToken]);
+
+  useEffect(() => {
+    const token = walletStore.fromToken;
+    const amount = bridgeStore.amount;
+    const tips = useBridgeStore.getState().errorTips;
+    if (!token || !amount) {
+      if (tips === "Insufficient balance") {
+        useBridgeStore.getState().set({ errorTips: "" });
+      }
+      return;
+    }
+
+    const key = `${token.chainType}Balances` as keyof BalancesState;
+    const balance = balancesStore[key]?.[token.chainId || token.blockchain]?.[token.contractAddress] || "0";
+    let overBalance = false;
+    try {
+      overBalance = Big(amount).gt(balance || 0);
+    } catch {
+      overBalance = false;
+    }
+
+    if (overBalance) {
+      if (!tips || tips === "Insufficient balance") {
+        if (tips !== "Insufficient balance") {
+          useBridgeStore.getState().set({ errorTips: "Insufficient balance" });
+        }
+      }
+      return;
+    }
+
+    if (tips === "Insufficient balance") {
+      useBridgeStore.getState().set({ errorTips: "" });
+    }
+  }, [
+    bridgeStore.amount,
+    walletStore.fromToken,
+    balancesStore,
+    walletStore.toToken?.contractAddress,
+    walletStore.toToken?.blockchain,
+    fromWalletAddress,
+    toWalletAddress,
+    bridgeStore.recipientAddress,
+    configStore.slippage,
+  ]);
 
   const getWalletForChain = (chainType: WalletType) => {
     return wallets[chainType];

@@ -1,4 +1,5 @@
 import InputNumber from "@/components/input-number";
+import FieldAlert from "@/components/field-alert";
 import Chain from "./chain";
 import { formatNumber } from "@/utils/format/number";
 import Big from "big.js";
@@ -17,6 +18,7 @@ const NetworkCard = (props: any) => {
     children,
     rightContent,
     titleContent,
+    valueAlert,
   } = props;
 
   const value = useMemo(() => {
@@ -49,9 +51,11 @@ const NetworkCard = (props: any) => {
         <Chain key={direction} token={token} isTo={direction === "to"} />
       </div>
       <div className={clsx("w-full flex justify-between items-center gap-2 mt-3 pr-2.5 pl-5", rowClassName)}>
-        <div className={clsx("text-xs text-[#9FA7BA] leading-[100%] font-['SpaceGrotesk] font-normal", disabled ? "opacity-30" : "")}>
-          {formatNumber(value, 2, true, { prefix: "$", round: Big.roundDown, isZeroPrecision: true })}
-        </div>
+        <FieldAlert active={valueAlert} iconPosition="end">
+          <div className={clsx("text-xs text-[#9FA7BA] leading-[100%] font-['SpaceGrotesk] font-normal", disabled ? "opacity-30" : "")}>
+            {formatNumber(value, 2, true, { prefix: "$", round: Big.roundDown, isZeroPrecision: true })}
+          </div>
+        </FieldAlert>
         {rightContent}
       </div>
       {children}
