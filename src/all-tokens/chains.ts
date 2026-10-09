@@ -138,6 +138,7 @@ export const chainsRpcUrls: Record<string, string[]> = {
     "https://berachain-rpc.publicnode.com",
   ],
   "Monad": [
+    `${ProxyRpcHost}/monad`,
     "https://rpc.monad.xyz",
     "https://rpc1.monad.xyz",
   ],

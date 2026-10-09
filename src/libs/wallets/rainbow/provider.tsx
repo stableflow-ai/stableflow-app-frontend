@@ -13,6 +13,7 @@ import {
   plasma,
   mantle,
   megaeth,
+  monad,
   ink,
   stable,
   celo,
@@ -129,7 +130,7 @@ const arc = defineChain({
   },
 });
 
-// RPC_CHAINS="tron,solana,aptos,aptos,sui,ethereum,arbitrum,bsc,avalanche,base,polygon,gnosis,optimism,berachain,xlayer,plasma,mantle,megaeth,ink,stable,celo,sei,fraxtal,katana,pharos,arc"
+// RPC_CHAINS="tron,solana,aptos,aptos,sui,ethereum,arbitrum,bsc,avalanche,base,polygon,gnosis,optimism,berachain,monad,xlayer,plasma,mantle,megaeth,ink,stable,celo,sei,fraxtal,katana,pharos,arc"
 const isSignedRpcUrl = (rpcUrl: string) => {
   return rpcUrl.includes(PROXY_RPC_DOMAIN);
 }
@@ -168,6 +169,7 @@ const RpcUrls: any = {
   [plasma.id]: fallback(getChainRpcUrl("Plasma").rpcUrls.map((rpc) => http(rpc, getSignedRpcHttpConfig(rpc, "plasma")))),
   [mantle.id]: fallback(getChainRpcUrl("Mantle").rpcUrls.map((rpc) => http(rpc, getSignedRpcHttpConfig(rpc, "mantle")))),
   [megaeth.id]: fallback(getChainRpcUrl("MegaETH").rpcUrls.map((rpc) => http(rpc, getSignedRpcHttpConfig(rpc, "megaeth")))),
+  [monad.id]: fallback(getChainRpcUrl("Monad").rpcUrls.map((rpc) => http(rpc, getSignedRpcHttpConfig(rpc, "monad")))),
   [ink.id]: fallback(getChainRpcUrl("Ink").rpcUrls.map((rpc) => http(rpc, getSignedRpcHttpConfig(rpc, "ink")))),
   [stable.id]: fallback(getChainRpcUrl("Stable").rpcUrls.map((rpc) => http(rpc, getSignedRpcHttpConfig(rpc, "stable")))),
   [celo.id]: fallback(getChainRpcUrl("Celo").rpcUrls.map((rpc) => http(rpc, getSignedRpcHttpConfig(rpc, "celo")))),
@@ -219,6 +221,7 @@ const wagmiConfig = createConfig({
     plasma,
     mantle,
     megaeth,
+    monad,
     ink,
     stable,
     celo,
@@ -244,6 +247,7 @@ const wagmiConfig = createConfig({
     [plasma.id]: RpcUrls[plasma.id] || http(),
     [mantle.id]: RpcUrls[mantle.id] || http(),
     [megaeth.id]: RpcUrls[megaeth.id] || http(),
+    [monad.id]: RpcUrls[monad.id] || http(),
     [ink.id]: RpcUrls[ink.id] || http(),
     [stable.id]: RpcUrls[stable.id] || http(),
     [celo.id]: RpcUrls[celo.id] || http(),
