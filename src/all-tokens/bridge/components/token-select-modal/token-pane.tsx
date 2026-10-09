@@ -136,7 +136,7 @@ export default function TokenPane({
                     <img
                       src={token.chainIcon}
                       alt=""
-                      className="absolute z-1 -right-[2px] -bottom-[2px] w-[14px] h-[14px] rounded-[4px] border border-white"
+                      className="absolute z-10 -right-[2px] -bottom-[2px] w-[14px] h-[14px] rounded-[4px] border border-white"
                     />
                   </div>
                   <div className="text-left">

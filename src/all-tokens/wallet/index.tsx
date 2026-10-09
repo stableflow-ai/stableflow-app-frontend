@@ -373,7 +373,7 @@ export default function Wallet() {
                                 <img
                                   src={row.chainIcon}
                                   alt=""
-                                  className="absolute z-1 -right-[2px] -bottom-[2px] w-[12px] h-[12px] rounded-[4px] border border-white"
+                                  className="absolute z-10 -right-[2px] -bottom-[2px] w-[12px] h-[12px] rounded-[4px] border border-white"
                                 />
                               </div>
                               <div>

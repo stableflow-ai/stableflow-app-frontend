@@ -25,7 +25,7 @@ const LazyImage = (props: Props) => {
 
   const renderFallback = useMemo(() => {
     if (typeof fallbackSrc === 'string') {
-      return <img src={fallbackSrc} alt={alt ?? ''} style={style} />;
+      return <img src={fallbackSrc} alt={alt ?? ''} style={style} className="w-full h-full object-cover" />;
     }
     if (fallbackSrc) {
       return <>{fallbackSrc}</>;
