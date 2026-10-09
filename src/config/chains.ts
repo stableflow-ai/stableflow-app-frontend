@@ -154,6 +154,10 @@ export const chainsRpcUrls: Record<string, string[]> = {
     `${ProxyRpcHost}/megaeth`,
     "https://mainnet.megaeth.com/rpc",
   ],
+  "Monad": [
+    `${ProxyRpcHost}/monad`,
+    "https://rpc.monad.xyz",
+  ],
   "Ink": [
     `${ProxyRpcHost}/ink`,
     "https://rpc-gel.inkonchain.com",
@@ -509,6 +513,22 @@ const chains: Record<string, ChainType> = {
       decimals: 18,
     },
     ...getChainRpcUrl("MegaETH"),
+  },
+  monad: {
+    chainName: "Monad",
+    blockchain: "monad",
+    chainIcon: getStableflowChainLogo("Monad"),
+    chainIconGray: getStableflowChainLogo("Monad-gray"),
+    chainType: chainTypes.evm.value,
+    chainId: 143,
+    blockExplorerUrl: "https://monadvision.com/tx",
+    blockExplorerUrls: ["https://monadvision.com"],
+    primaryColor: "#836EF9",
+    nativeToken: {
+      symbol: "MON",
+      decimals: 18,
+    },
+    ...getChainRpcUrl("Monad"),
   },
   ink: {
     chainName: "Ink",

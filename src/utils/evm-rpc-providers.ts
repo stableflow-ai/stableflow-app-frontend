@@ -70,7 +70,7 @@ class SequentialFallbackProvider extends ethers.AbstractProvider {
   }
 }
 
-// RPC_CHAINS="tron,solana,aptos,aptos,sui,ethereum,arbitrum,bsc,avalanche,base,polygon,gnosis,optimism,berachain,xlayer,plasma,mantle,megaeth,ink,stable,celo,sei,fraxtal,katana,pharos,arc"
+// RPC_CHAINS="tron,solana,aptos,aptos,sui,ethereum,arbitrum,bsc,avalanche,base,polygon,gnosis,optimism,berachain,monad,xlayer,plasma,mantle,megaeth,ink,stable,celo,sei,fraxtal,katana,pharos,arc"
 const ChainNameMap: Record<string, string> = {
   "eth": "ethereum",
   "arb": "arbitrum",
@@ -81,6 +81,7 @@ const ChainNameMap: Record<string, string> = {
   "gnosis": "gnosis",
   "op": "optimism",
   "bera": "berachain",
+  "monad": "monad",
   "xlayer": "xlayer",
   "plasma": "plasma",
   "mantle": "mantle",
