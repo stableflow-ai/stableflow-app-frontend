@@ -13,6 +13,12 @@ export const DEFAULT_EVM_AGGREGATOR_GAS_UNITS = "350000";
 /** EVM native transfer gas units (nearintents deposit / plain transfer). */
 export const DEFAULT_EVM_NATIVE_TRANSFER_GAS_UNITS = "21000";
 
+/** Native gas token ids used by Rhea / OpenOcean swap payloads. */
+export const NATIVE_EVM_TOKEN_ADDRESSES = new Set([
+  "0x0000000000000000000000000000000000000000",
+  "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+]);
+
 /** EVM ERC20 transfer gas units (nearintents deposit / plain transfer). */
 export const DEFAULT_EVM_ERC20_TRANSFER_GAS_UNITS = "65000";
 

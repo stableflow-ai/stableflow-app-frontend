@@ -1,3 +1,4 @@
+import { NATIVE_EVM_TOKEN_ADDRESSES } from "./config";
 import type { RheaApproveItem, RheaSwapResponse, RheaSwapTx } from "./types";
 import { rheaOrderSubmit } from "./swap";
 
@@ -15,6 +16,23 @@ export type RheaTxExecutor = (params: {
 }) => Promise<{ hash: string }>;
 
 export type RheaSigner = (signingRequest: unknown) => Promise<Record<string, unknown>>;
+
+const isEmptyTxValue = (value: unknown): boolean => {
+  if (value == null) return true;
+  const raw = String(value).trim().toLowerCase();
+  return raw === "" || raw === "0" || raw === "0x0";
+};
+
+/** Payable native swaps need msg.value. Fill it from amountIn when the payload omitted it. */
+const withNativeSwapValue = (swap: RheaSwapResponse): RheaSwapTx => {
+  const tx = swap.tx;
+  if (!tx) return tx as RheaSwapTx;
+  const tokenIn = String(swap.tokenIn?.address || "").trim().toLowerCase();
+  if (!NATIVE_EVM_TOKEN_ADDRESSES.has(tokenIn) || !isEmptyTxValue(tx.value) || !swap.amountIn) {
+    return tx;
+  }
+  return { ...tx, value: swap.amountIn };
+};
 
 /** API returns `{ spender, tx }` or a bare RheaSwapTx */
 const unwrapApproveTx = (item: RheaApproveItem): RheaSwapTx => {
@@ -84,7 +102,7 @@ export async function executeRheaSwapResponse(
     const { hash } = await deps.executeTx({
       chainType,
       fromChain,
-      tx: swap.tx,
+      tx: withNativeSwapValue(swap),
       approve: null,
     });
     return {
