@@ -84,7 +84,7 @@ export default function TokenPane({
         <input
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
-          placeholder="Search source token and chain"
+          placeholder="Search token or contract address"
           className={clsx(
             "flex-1 outline-none text-[14px] text-[#444C59] placeholder:text-[#9FA7BA] placeholder:opacity-50 bg-transparent min-w-0",
             search && "pr-8"

@@ -109,7 +109,11 @@ export default function TokenSelectModal() {
         return false;
       }
       if (!q) return true;
-      return !!t.symbol?.toLowerCase().includes(q);
+      return (
+        !!t.symbol?.toLowerCase().includes(q) ||
+        !!t.contractAddress?.toLowerCase().includes(q) ||
+        !!t.assetId?.toLowerCase().includes(q)
+      );
     });
     return sortTokensByUsd(list, getBalance);
     // eslint-disable-next-line react-hooks/exhaustive-deps
