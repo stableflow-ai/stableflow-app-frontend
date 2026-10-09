@@ -22,6 +22,8 @@ import { v4 as uuidV4 } from "uuid";
 import { BridgeFees, TronTransferStepStatus } from "@/config/tron";
 import { useTronEnergy } from "./use-tron";
 import { BridgeFee } from "@/services/oneclick";
+import { EXECUTABLE_QUOTE_REFRESH_BEFORE_MS, isNearIntentsQuoteService, NEAR_INTENTS_QUOTE_SERVICES } from "@/services/oneclick/config";
+import { isExecutableQuoteCurrent } from "@/services/oneclick/utils";
 import { useAccount, useSwitchChain } from "wagmi";
 import { usePendingHistory } from "@/views/history/hooks/use-pending-history";
 import { csl } from "@/utils/log";
@@ -95,8 +97,9 @@ export default function useBridge(props?: any) {
     const isFromTron = walletStore.fromToken.chainType === "tron";
 
     const formatQuoteParams = async () => {
+      const quoteDry = isNearIntentsQuoteService(service) ? false : params.dry;
       const _params: any = {
-        dry: params.dry,
+        dry: quoteDry,
         amountWei: params.amountWei,
         refundTo: fromWalletAddress || "",
         recipient: bridgeStore.recipientAddress || toWalletAddress || "",
@@ -180,18 +183,23 @@ export default function useBridge(props?: any) {
 
       bridgeStore.setQuoteData(service, quoteRes);
 
-      if (params.dry) {
-        ServiceMap[service].estimateTransaction(quoteParams, quoteRes)
+      const shouldEstimateAsync = (params.dry || isNearIntentsQuoteService(service))
+        && typeof ServiceMap[service].estimateTransaction === "function";
+      if (shouldEstimateAsync) {
+        const estimatePromise = ServiceMap[service].estimateTransaction(quoteParams, quoteRes)
           .then((estimateRes: any) => {
             csl("QuoteRoutes", "green-500", "%s estimateTransaction res: %o", service, estimateRes);
-            if (estimateRes.quoteId !== requestIdRef.current) {
-              return;
+            if (!estimateRes || estimateRes.quoteId !== requestIdRef.current) {
+              return estimateRes;
             }
             bridgeStore.setQuoteData(service, estimateRes);
+            return estimateRes;
           })
           .catch((estimateErr: any) => {
-            // csl("QuoteRoutes", "red-500", "%s estimateTransaction failed: %o", service, estimateErr);
+            csl("QuoteRoutes", "red-500", "%s estimateTransaction failed: %o", service, estimateErr);
+            return null;
           });
+        gasEstimateRef.current.set(service, { quoteId: requestId, promise: estimatePromise });
       }
 
       addQuoteTrack({
@@ -283,6 +291,9 @@ export default function useBridge(props?: any) {
   const [isAutoSelect, setAutoSelect] = useState(false);
   // Request ID counter to ensure only the latest request results are processed
   const requestIdRef = useRef(0);
+  const gasEstimateRef = useRef<Map<Service, { quoteId: number; promise: Promise<unknown>; }>>(new Map());
+  const executableQuoteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const quoteWithRequestIdRef = useRef<(params: { dry: boolean; from?: string; }, isSync?: boolean) => Promise<any>>(async () => undefined);
   // Auto requote timer ref for CCTP from Solana USDC
   const autoRequoteTimerRef = useRef<NodeJS.Timeout | null>(null);
   // Track previous quoting state to detect when quote completes
@@ -517,7 +528,8 @@ export default function useBridge(props?: any) {
       return result;
     }
 
-    const _quoteData = bridgeStore.quoteDataMap.get(bridgeStore.quoteDataService);
+    const bridgeState = useBridgeStore.getState();
+    const _quoteData = bridgeState.quoteDataMap.get(bridgeState.quoteDataService);
     let _estimateSourceGas = _quoteData?.totalEstimateSourceGas || 0n;
 
     // stale chain
@@ -611,6 +623,21 @@ export default function useBridge(props?: any) {
     return permitResult;
   };
 
+  const waitForQuoteGasEstimate = async (service: Service, quoteId?: number) => {
+    if (quoteId == null) {
+      return;
+    }
+    const task = gasEstimateRef.current.get(service);
+    if (!task || task.quoteId !== quoteId) {
+      return;
+    }
+    try {
+      await task.promise;
+    } catch (error) {
+      csl("transfer", "red-500", "in-flight gas estimate failed: %o", error);
+    }
+  };
+
   const transfer = async () => {
     const addTrackParams: any = {
       type: "transfer_button",
@@ -629,7 +656,42 @@ export default function useBridge(props?: any) {
         throw new Error("Please select a source token");
       }
       bridgeStore.set({ transferring: true });
-      const _quote = await quoteWithRequestId({ dry: false }, true);
+      const selectedService = bridgeStore.quoteDataService;
+      const cachedQuote = bridgeStore.quoteDataMap.get(selectedService);
+      const currentAmountWei = Big(bridgeStore.amount || 0)
+        .times(10 ** (walletStore.fromToken?.decimals || 0))
+        .toFixed(0);
+      let _quote: any;
+      if (isNearIntentsQuoteService(selectedService) && isExecutableQuoteCurrent(cachedQuote, {
+        amountWei: currentAmountWei,
+        fromToken: walletStore.fromToken,
+        toToken: walletStore.toToken,
+        recipient: bridgeStore.recipientAddress || toWalletAddress || "",
+        refundTo: fromWalletAddress || "",
+        slippage: configStore.slippage,
+        acceptTronEnergy: bridgeStore.acceptTronEnergy,
+      })) {
+        csl("transfer", "green-400", "reuse executable quote, deadline: %o", cachedQuote?.quoteDeadline);
+        await waitForQuoteGasEstimate(selectedService, cachedQuote?.quoteId);
+        _quote = {
+          type: selectedService,
+          data: useBridgeStore.getState().quoteDataMap.get(selectedService),
+        };
+      } else {
+        _quote = await quoteWithRequestId({ dry: false }, true);
+        if (isNearIntentsQuoteService(selectedService)) {
+          await waitForQuoteGasEstimate(selectedService, _quote?.data?.quoteId);
+          const latestQuote = useBridgeStore.getState().quoteDataMap.get(selectedService);
+          if (latestQuote && !latestQuote.errMsg) {
+            _quote = {
+              type: selectedService,
+              data: latestQuote,
+            };
+          }
+        } else if (_quote?.data?.quoteId != null) {
+          await waitForQuoteGasEstimate(selectedService, _quote.data.quoteId);
+        }
+      }
 
       if (!_quote.data) {
         throw new Error(_quote.errMsg || "Transfer failed");
@@ -746,28 +808,6 @@ export default function useBridge(props?: any) {
         bridgeStore.modifyQuoteData(bridgeStore.quoteDataService, {
           needApprove: false,
         });
-      }
-
-      // Try to re-estimate gas
-      if (ServiceMap[bridgeStore.quoteDataService].estimateTransaction) {
-        const estimateTransactionQuoteData = {
-          ..._quote.data,
-          needApprove: false,
-        };
-        try {
-          const estimateTransactionResult = await ServiceMap[bridgeStore.quoteDataService].estimateTransaction(_quote.data.sourceQuoteParams, estimateTransactionQuoteData);
-          csl("transfer", "green-500", "final estimate transaction result: %o", estimateTransactionResult);
-          _quote.data = estimateTransactionResult;
-          bridgeStore.modifyQuoteData(bridgeStore.quoteDataService, {
-            fees: estimateTransactionResult.fees,
-            estimateSourceGas: estimateTransactionResult.estimateSourceGas,
-            totalEstimateSourceGas: estimateTransactionResult.totalEstimateSourceGas,
-            estimateSourceGasUsd: estimateTransactionResult.estimateSourceGasUsd,
-            totalFeesUsd: estimateTransactionResult.totalFeesUsd,
-          });
-        } catch (error) {
-          csl("transfer", "red-500", "final estimate transaction failed: %o", error);
-        }
       }
 
       // create solana usdc account for CCTP
@@ -1093,6 +1133,7 @@ export default function useBridge(props?: any) {
     const currentRequestId = requestIdRef.current;
     return quote({ dry: params.dry }, isSync, currentRequestId);
   };
+  quoteWithRequestIdRef.current = quoteWithRequestId;
 
   const { run: debouncedQuote, cancel: cancelQuote } = useDebounceFn(quoteWithRequestId, {
     wait: 1000
@@ -1132,6 +1173,7 @@ export default function useBridge(props?: any) {
     toWalletAddress,
     // Re-request quote when slippage changes
     configStore.slippage,
+    bridgeStore.acceptTronEnergy,
     allTokensEnabled,
   ]);
 
@@ -1345,6 +1387,52 @@ export default function useBridge(props?: any) {
     walletStore.fromToken?.symbol,
     walletStore.toToken?.symbol,
     debouncedQuote,
+  ]);
+
+  useEffect(() => {
+    if (executableQuoteTimerRef.current) {
+      clearTimeout(executableQuoteTimerRef.current);
+      executableQuoteTimerRef.current = null;
+    }
+    if (allTokensEnabled || bridgeStore.transferring) {
+      return;
+    }
+
+    const deadlines: number[] = [];
+    for (const service of NEAR_INTENTS_QUOTE_SERVICES) {
+      const quoteData = bridgeStore.quoteDataMap.get(service);
+      if (!quoteData?.quoteDeadline || quoteData.errMsg) {
+        continue;
+      }
+      const deadline = Date.parse(quoteData.quoteDeadline);
+      if (Number.isFinite(deadline)) {
+        deadlines.push(deadline);
+      }
+    }
+    if (!deadlines.length) {
+      return;
+    }
+
+    const refreshAt = Math.min(...deadlines) - EXECUTABLE_QUOTE_REFRESH_BEFORE_MS;
+    const delay = Math.max(0, refreshAt - Date.now());
+    executableQuoteTimerRef.current = setTimeout(() => {
+      if (useBridgeStore.getState().transferring) {
+        return;
+      }
+      csl("autoRequote", "gray-800", "Refreshing executable near-intents quote");
+      void quoteWithRequestIdRef.current({ dry: true, from: "executable quote refresh" });
+    }, delay);
+
+    return () => {
+      if (executableQuoteTimerRef.current) {
+        clearTimeout(executableQuoteTimerRef.current);
+        executableQuoteTimerRef.current = null;
+      }
+    };
+  }, [
+    allTokensEnabled,
+    bridgeStore.transferring,
+    bridgeStore.quoteDataMap,
   ]);
 
   const onRefreshQuote = () => {

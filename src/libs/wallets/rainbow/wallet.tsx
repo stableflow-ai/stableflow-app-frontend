@@ -945,8 +945,6 @@ export default class RainbowWallet {
       refundTo,
       depositAddress,
       amountWei,
-      prices,
-      evmGasFees,
     } = params;
 
     const execTime = new ExecTime({ type: `OneClick EVM ${fromToken.chainName}`, logStyle: "stone-300" });
@@ -966,34 +964,19 @@ export default class RainbowWallet {
     ];
 
     execTime.breakpoint();
-    const mergedCalls = [
-      this.allowance({
-        dry,
-        contractAddress: fromToken.contractAddress,
-        address: refundTo,
-        spender: proxyAddress,
-        amountWei: amountWei,
-        provider,
-      }),
-      this.estimateTransaction({
-        dry,
-        contract: proxyContract,
-        method: "proxyTransfer",
-        param: proxyParam,
-        fromToken,
-        prices,
-        evmGasFees,
-      })
-    ];
-    const [allowance, ett]: any = await Promise.all(mergedCalls);
+    const allowance = await this.allowance({
+      dry,
+      contractAddress: fromToken.contractAddress,
+      address: refundTo,
+      spender: proxyAddress,
+      amountWei: amountWei,
+      provider,
+    });
     result.needApprove = allowance.needApprove;
     result.approveSpender = proxyAddress;
-    result.fees.estimateGasUsd = ett.estimateSourceGasUsd;
-    result.estimateSourceGas = ett.estimateSourceGas;
-    result.totalEstimateSourceGas = ett.estimateSourceGas;
-    result.estimateSourceGasUsd = ett.estimateSourceGasUsd;
-    proxyParam.push({ gasLimit: ett.estimateSourceGasLimit });
-    execTime.log("allowance & estimateTransaction");
+    // Placeholder so the async gas estimate can overwrite gasLimit before send.
+    proxyParam.push({ gasLimit: DEFAULT_GAS_LIMIT_FAILED / 2n });
+    execTime.log("allowance");
 
     result.sendParam = {
       method: "proxyTransfer",

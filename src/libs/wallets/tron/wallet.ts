@@ -993,7 +993,6 @@ export default class TronWallet {
       refundTo,
       depositAddress,
       amountWei,
-      prices,
     } = params;
 
     const result: any = { fees: {} };
@@ -1052,35 +1051,7 @@ export default class TronWallet {
     const tx = await this.tronWeb.transactionBuilder.triggerSmartContract(...transactionParams);
     execTime.log("transactionBuilder.triggerSmartContract");
     result.sendParam.tx = tx;
-
-    execTime.breakpoint();
-    const ett = await this.estimateTransaction({
-      dry,
-      transactionParams,
-      fromToken,
-      prices,
-      defaultEnergyUsed: 200000,
-      defaultRawDataHexLength: 500,
-    });
-    execTime.log("estimateTransaction");
-    result.fees.estimateGasUsd = ett.estimateSourceGasUsd;
-    result.estimateSourceGas = ett.estimateSourceGas;
-    result.totalEstimateSourceGas = ett.estimateSourceGas;
-    result.estimateSourceGasUsd = ett.estimateSourceGasUsd;
-
-    if (result.needApprove) {
-      execTime.breakpoint();
-      const estApproveGas = await this.estimateApprove({
-        dry,
-        amountWei,
-        spender: result.approveSpender,
-        fromToken,
-        prices,
-      });
-      result.estimateApproveGas = estApproveGas.estimateSourceGas;
-      execTime.log("estimateApprove");
-    }
-
+    // Gas simulation runs after the quote is shown. The unsigned tx already carries fee_limit.
     result.sendParam.transactionParams = transactionParams;
 
     execTime.logTotal("quoteOneClickPorxy");

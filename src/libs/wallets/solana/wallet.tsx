@@ -1013,12 +1013,10 @@ export default class SolanaWallet {
 
   async quoteOneClickProxy(params: any) {
     const {
-      dry,
       refundTo,
       proxyAddress,
       fromToken,
       amountWei,
-      prices,
       depositAddress,
     } = params;
 
@@ -1110,36 +1108,20 @@ export default class SolanaWallet {
       execTime.breakpoint();
       const message = transaction.compileMessage();
       const versionedTx = new VersionedTransaction(message);
-      const ett = await this.estimateTransaction({
-        dry,
-        versionedTx,
-        fromToken,
-        prices,
-        priorityFeeLamports: computeBudget.priorityFeeLamports,
-        // The recipient token account we are about to create is the only rent this route pays.
-        fallbackRentLamports: needCreateToTokenAccount ? await getAssociatedTokenAccountRent(connection) : 0,
-      });
-      execTime.log("estimateTransaction");
+      const fallbackRentLamports = needCreateToTokenAccount ? await getAssociatedTokenAccountRent(connection) : 0;
 
       result.sendParam = {
         transaction,
         versionedTx,
-        // Services re-run estimateTransaction with `...sendParam`; carrying these keeps the
-        // refreshed estimate identical to the one produced here.
+        // The async estimate spreads sendParam, so these keep that fee identical to this build.
         priorityFeeLamports: computeBudget.priorityFeeLamports,
-        fallbackRentLamports: needCreateToTokenAccount ? await getAssociatedTokenAccountRent(connection) : 0,
+        fallbackRentLamports,
         broadcastMeta: this.buildBroadcastMeta({
           route: ServiceBackend[Service.OneClick],
           fromTokenSymbol: fromToken?.symbol,
           computeBudget,
         }),
       };
-
-      result.fees.estimateGasUsd = ett.estimateSourceGasUsd;
-      result.fees.accountRentUsd = ett.accountRentUsd;
-      result.estimateSourceGas = ett.estimateSourceGas;
-      result.totalEstimateSourceGas = ett.estimateSourceGas + ett.accountRentLamports;
-      result.estimateSourceGasUsd = ett.estimateSourceGasUsd;
 
       execTime.logTotal("quoteOneClickPorxy");
 
