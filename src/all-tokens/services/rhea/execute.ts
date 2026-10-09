@@ -26,7 +26,7 @@ const isEmptyTxValue = (value: unknown): boolean => {
 /** Payable native swaps need msg.value. Fill it from amountIn when the payload omitted it. */
 const withNativeSwapValue = (swap: RheaSwapResponse): RheaSwapTx => {
   const tx = swap.tx;
-  if (!tx) return tx as RheaSwapTx;
+  if (!tx) throw new Error("Missing swap transaction");
   const tokenIn = String(swap.tokenIn?.address || "").trim().toLowerCase();
   if (!NATIVE_EVM_TOKEN_ADDRESSES.has(tokenIn) || !isEmptyTxValue(tx.value) || !swap.amountIn) {
     return tx;
