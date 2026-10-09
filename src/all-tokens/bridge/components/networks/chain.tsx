@@ -54,7 +54,7 @@ export default function Chain({ token, isTo }: any) {
         />
         <LazyImage
           src={token?.chainIcon}
-          containerClassName="w-4.5 h-4.5 rounded-sm border border-white absolute! -right-1 -bottom-1 overflow-hidden"
+          containerClassName="z-10 w-4.5 h-4.5 rounded-sm border border-white absolute! -right-1 -bottom-1 overflow-hidden"
           fallbackSrc={(
             <div className="w-full h-full rounded-sm bg-[#EDF0F7]"></div>
           )}
@@ -99,7 +99,7 @@ const WithChain = ({ token, isTo, openWallet }: any) => {
         />
         <img
           src={token.chainIcon}
-          className="absolute right-[-5px] bottom-[-5px] w-5 md:w-6 h-5 md:h-6 rounded-[6px] border border-white object-center object-contain shrink-0"
+          className="absolute z-10 right-[-5px] bottom-[-5px] w-5 md:w-6 h-5 md:h-6 rounded-[6px] border border-white object-center object-contain shrink-0"
         />
       </div>
 

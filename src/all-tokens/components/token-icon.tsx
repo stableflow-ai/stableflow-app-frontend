@@ -54,7 +54,7 @@ export default function TokenIcon({
       width={width}
       height={height}
       className={className}
-      containerClassName={clsx(containerClassName, "shrink-0 rounded-full overflow-hidden")}
+      containerClassName={clsx(containerClassName, "isolate shrink-0 rounded-full overflow-hidden")}
     />
   );
 }
