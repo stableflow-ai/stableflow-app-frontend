@@ -45,7 +45,7 @@ export default function Chain({ token, isTo }: any) {
     <ChainCard
       onClick={openTokenSelect}
     >
-      <div className="w-10 h-10 relative">
+      <div className="w-10 h-10 relative isolate">
         <TokenIcon
           src={token?.icon}
           symbol={token?.symbol}
@@ -90,7 +90,7 @@ const WithChain = ({ token, isTo, openWallet }: any) => {
       )}
       onClick={openWallet}
     >
-      <div className="relative w-11 md:w-12.5 h-11 md:h-12.5 shrink-0">
+      <div className="relative isolate w-11 md:w-12.5 h-11 md:h-12.5 shrink-0">
         <TokenIcon
           src={token.icon}
           symbol={token.symbol}

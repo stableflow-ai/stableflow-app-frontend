@@ -985,6 +985,11 @@ export default class SolanaWallet {
     }
 
     const raw = Buffer.from(serialized, "base64");
+    // Solana rejects packets larger than 1232 bytes. Serialize then throws
+    // "encoding overruns Uint8Array" inside the wallet.
+    if (raw.length > 1232) {
+      throw new Error("This route's transaction is too large to submit. Try another route.");
+    }
     let transaction: Transaction | VersionedTransaction;
     try {
       transaction = VersionedTransaction.deserialize(raw);
