@@ -10,6 +10,10 @@ const INVALID_RPC_CONFIGURATION_ERROR_MESSAGE =
   "Invalid RPC configuration. Please check RPC settings or switch to another RPC.";
 const INVALID_NETWORK_ERROR_MESSAGE = "Network unstable. Please try again.";
 const USER_REJECTED_TRANSACTION_MESSAGE = "User rejected transaction";
+const SLIPPAGE_LIMIT_EXCEEDED_MESSAGE =
+  "Slippage limit exceeded. Increase slippage tolerance and try again.";
+const TRANSACTION_TOO_LARGE_MESSAGE =
+  "This route's transaction is too large to submit. Try another route.";
 const POST_APPROVE_ALLOWANCE_MAX_RETRIES = 5;
 const POST_APPROVE_ALLOWANCE_RETRY_DELAY = 2000;
 
@@ -167,6 +171,21 @@ export const formatBridgeRpcErrorMessage = (errorMessage: string) => {
     return INVALID_NETWORK_ERROR_MESSAGE;
   }
 
+  if (
+    normalizedMessage.includes("slippagelimitexceeded") ||
+    normalizedMessage.includes("slippage limit exceeded") ||
+    normalizedMessage.includes("custom program error: 0x3a99")
+  ) {
+    return SLIPPAGE_LIMIT_EXCEEDED_MESSAGE;
+  }
+
+  if (
+    normalizedMessage.includes("encoding overruns uint8array") ||
+    normalizedMessage.includes("transaction is too large to submit")
+  ) {
+    return TRANSACTION_TOO_LARGE_MESSAGE;
+  }
+
   return errorMessage;
 };
 
@@ -224,6 +243,7 @@ export const isUserRejectedError = (error: unknown) => {
 export const isReQuoteError = (error: unknown) => {
   const err = error as any;
   if (err?.code === -2 || err?.code === "-2") return true;
+  if (formatBridgeError(error) === SLIPPAGE_LIMIT_EXCEEDED_MESSAGE) return true;
   const message = String(err?.message || err || "").toLowerCase();
   return message.includes("re-quote");
 };
