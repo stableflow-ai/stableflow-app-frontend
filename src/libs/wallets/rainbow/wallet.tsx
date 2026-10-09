@@ -22,6 +22,22 @@ import { FRAXZERO_MIDDLE_TOKEN_FRXUSD, FRAXZERO_MIDDLE_TOKEN_USDC } from "@/serv
 
 const DEFAULT_GAS_LIMIT = 100000n;
 const DEFAULT_GAS_LIMIT_FAILED = 4000000n;
+const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+const EVM_ADDRESS = /^0x[a-fA-F0-9]{40}$/;
+
+/** Native gas token: eth/native symbol, the zero address, or a non-address id whose symbol matches the chain native. */
+function isEvmNativeGasToken(token: any): boolean {
+  const symbol = String(token?.symbol || "");
+  if (symbol === "eth" || symbol === "ETH" || symbol === "native") return true;
+
+  const address = String(token?.contractAddress || "").trim();
+  if (address.toLowerCase() === ZERO_ADDRESS) return true;
+
+  const nativeSymbol = token?.nativeToken?.symbol;
+  return !!nativeSymbol
+    && symbol.toLowerCase() === String(nativeSymbol).toLowerCase()
+    && !EVM_ADDRESS.test(address);
+}
 
 export default class RainbowWallet {
   provider: any;
@@ -65,7 +81,7 @@ export default class RainbowWallet {
         provider = evmRpcFallbackProvider(token);
       }
 
-      if (token.symbol === "eth" || token.symbol === "ETH" || token.symbol === "native") {
+      if (isEvmNativeGasToken(token)) {
         const balance = await provider.getBalance(account);
         return balance.toString();
       }
@@ -724,7 +740,7 @@ export default class RainbowWallet {
     const request: Record<string, any> = {
       to: tx.to,
       data: tx.data || "0x",
-      value: tx.value != null && tx.value !== "" ? BigInt(tx.value) : 0n,
+      value: tx.value != null && tx.value !== "" ? ethers.toBigInt(tx.value) : 0n,
     };
     if (tx.gasLimit != null && tx.gasLimit !== "") {
       request.gasLimit = BigInt(tx.gasLimit);

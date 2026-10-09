@@ -8,6 +8,28 @@ export interface SignedRpcProvider extends ethers.AbstractProvider {
 }
 
 const providerCache = new Map<number, SignedRpcProvider>();
+const JSON_RPC_EXECUTION_ERROR = 3;
+
+/** True when the node executed the call and the contract reverted. Transport failures stay false. */
+export function isExecutionRevert(err: unknown): boolean {
+  if (ethers.isError(err, "CALL_EXCEPTION")) return true;
+  if (!err || typeof err !== "object") return false;
+
+  const error = err as {
+    code?: unknown;
+    message?: unknown;
+    error?: { code?: unknown; data?: unknown; message?: unknown };
+    info?: { error?: { code?: unknown; data?: unknown; message?: unknown } };
+  };
+  if (error.code === JSON_RPC_EXECUTION_ERROR || error.code === "CALL_EXCEPTION") return true;
+
+  const nested = error.error || error.info?.error;
+  if (nested?.code === JSON_RPC_EXECUTION_ERROR) return true;
+  if (typeof nested?.data === "string" && nested.data.startsWith("0x") && nested.data.length > 2) return true;
+
+  const message = typeof error.message === "string" ? error.message : nested?.message;
+  return typeof message === "string" && message.toLowerCase().includes("execution reverted");
+}
 
 class SequentialFallbackProvider extends ethers.AbstractProvider {
   private providers: ethers.JsonRpcProvider[];
@@ -40,6 +62,7 @@ class SequentialFallbackProvider extends ethers.AbstractProvider {
       try {
         return await provider.send(method, params);
       } catch (err) {
+        if (isExecutionRevert(err)) throw err;
         lastError = err;
       }
     }

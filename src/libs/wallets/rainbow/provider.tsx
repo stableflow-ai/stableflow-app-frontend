@@ -50,7 +50,7 @@ import { useEVMWalletInfo } from "@/hooks/use-evm-wallet-info";
 import { metadata } from "./metadata";
 import { generateRpcSignature } from "@/libs/signature";
 import { PROXY_RPC_DOMAIN } from "@/config/api";
-import { getSignedProviderByChainId } from "@/utils/evm-rpc-providers";
+import { getSignedProviderByChainId, isExecutionRevert } from "@/utils/evm-rpc-providers";
 
 // Read-only JSON-RPC methods that a wallet signer may trigger while populating
 // or waiting on a transaction. On mobile WalletConnect these are routed by the
@@ -91,8 +91,9 @@ const createSignedReadTransport = (
         if (signedProvider) {
           try {
             return await signedProvider.send(method, params ?? []);
-          } catch (_err) {
-            // Fall back to the wallet transport if the signed RPC fails.
+          } catch (err) {
+            // A contract revert is the node's answer. Only transport failures use the wallet RPC.
+            if (isExecutionRevert(err)) throw err;
           }
         }
       }
