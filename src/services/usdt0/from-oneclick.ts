@@ -142,6 +142,7 @@ export class OneClickUsdt0Service {
 
     return {
       ...oneClickResult,
+      quoteDeadline: oneClickResult.quoteDeadline,
       needPermit: true,
       permitSpender: USDT0_MIDDLE_CHAIN_LAYERZERO_EXECUTOR,
       permitToken: USDT0_MIDDLE_TOKEN_CHAIN,

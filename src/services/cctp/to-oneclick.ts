@@ -107,6 +107,7 @@ export class CCTPOneClickService {
       outputAmount: oneClickResult.outputAmount,
       priceImpact: oneClickResult.priceImpact,
       exchangeRate: oneClickResult.exchangeRate,
+      quoteDeadline: oneClickResult.quoteDeadline,
       quoteParam: {
         ...cctpResult.quoteParam,
         toToken: params.toToken,

@@ -330,13 +330,11 @@ export default class NearWallet {
 
   async quoteOneClickProxy(params: any) {
     const {
-      dry,
       proxyAddress,
       fromToken,
       refundTo,
       depositAddress,
       amountWei,
-      prices,
     } = params;
 
     const execTime = new ExecTime({ type: "OneClick NEAR", logStyle: "lime-200" });
@@ -436,21 +434,6 @@ export default class NearWallet {
         ]
       });
 
-      execTime.breakpoint();
-      const ett = await this.estimateTransaction({
-        dry,
-        transactions,
-        fromToken,
-        prices,
-      });
-      execTime.log("estimateTransaction");
-
-      result.fees.estimateGasUsd = ett.estimateSourceGasUsd;
-      result.estimateSourceGas = ett.estimateSourceGas;
-      result.totalEstimateSourceGas = ett.estimateSourceGas;
-      result.estimateSourceGasUsd = ett.estimateSourceGasUsd;
-
-      // Set sendParam for subsequent transaction sending
       result.sendParam = {
         transactions,
         callbackUrl: "/"
@@ -458,18 +441,6 @@ export default class NearWallet {
 
     } catch (error) {
       csl("Near quoteOneClickProxy", "red-500", "oneclick quote proxy failed: %o", error);
-      // Use default gas estimation
-      const ett = await this.estimateTransaction({
-        dry,
-        transactions: [null, null, null],
-        fromToken,
-        prices,
-      });
-
-      result.fees.estimateGasUsd = ett.estimateSourceGasUsd;
-      result.estimateSourceGas = ett.estimateSourceGas;
-      result.totalEstimateSourceGas = ett.estimateSourceGas;
-      result.estimateSourceGasUsd = ett.estimateSourceGasUsd;
     }
 
     execTime.logTotal("quoteOneClickProxy");

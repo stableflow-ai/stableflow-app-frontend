@@ -347,12 +347,10 @@ export default class SuiWallet {
 
   async quoteOneClickProxy(params: any) {
     const {
-      dry,
       proxyAddress,
       fromToken,
       depositAddress,
       amountWei,
-      prices,
     } = params;
 
     const result: any = { fees: {} };
@@ -376,17 +374,6 @@ export default class SuiWallet {
     });
 
     result.sendParam = { tx };
-
-    const ett = await this.estimateTransaction({
-      dry,
-      tx,
-      fromToken,
-      prices,
-    });
-    result.fees.estimateGasUsd = ett.estimateSourceGasUsd;
-    result.estimateSourceGas = ett.estimateSourceGas;
-    result.totalEstimateSourceGas = ett.estimateSourceGas;
-    result.estimateSourceGasUsd = ett.estimateSourceGasUsd;
 
     return result;
   }

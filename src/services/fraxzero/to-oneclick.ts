@@ -197,6 +197,7 @@ export class FraxZero2OneClickService extends FraxZeroService {
         outputAmount: finalOutputAmount,
         priceImpact: numberRemoveEndZero(Big(priceImpact).toFixed(4)),
         exchangeRate: numberRemoveEndZero(Big(exchangeRate).toFixed(6, Big.roundDown)),
+        quoteDeadline: thirdStepResult?.quoteDeadline,
         quoteParam: {
           ..._result?.quoteParam,
           fromToken,

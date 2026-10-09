@@ -465,7 +465,6 @@ export default class AptosWallet {
 
   async quoteOneClickProxy(params: any) {
     const {
-      dry,
       proxyAddress,
       fromToken,
       depositAddress,
@@ -491,39 +490,12 @@ export default class AptosWallet {
         throw new Error("Invalid sender address");
       }
 
-      // Get signer public key for simulation
-      let signerPublicKey: any;
-      if (this.account.publicKey) {
-        signerPublicKey = this.account.publicKey;
-      } else if (this.account.address) {
-        signerPublicKey = this.account.address;
-      } else {
-        throw new Error("Unable to get signer public key");
-      }
-
       const typeArgument = `0x1::fungible_asset::Metadata`;
 
       // const functionId = `${proxyAddress}::stableflow_proxy::proxy_transfer` as `${string}::${string}::${string}`;
       const functionId = `${proxyAddress}::stableflow_proxy::proxy_transfer_fa` as `${string}::${string}::${string}`;
       const functionArguments = [fromToken.contractAddress, depositAddress, amountWei];
 
-      execTime.breakpoint();
-      const ett = await this.estimateTransaction({
-        dry,
-        function: functionId,
-        typeArguments: [typeArgument],
-        functionArguments: functionArguments,
-        fromToken,
-        prices,
-      });
-      execTime.log("estimateTransaction");
-
-      result.fees.estimateGasUsd = ett.estimateSourceGasUsd;
-      result.estimateSourceGas = ett.estimateSourceGas;
-      result.totalEstimateSourceGas = ett.estimateSourceGas;
-      result.estimateSourceGasUsd = ett.estimateSourceGasUsd;
-
-      // Set sendParam for transaction
       result.sendParam = {
         function: functionId,
         typeArguments: [typeArgument],
