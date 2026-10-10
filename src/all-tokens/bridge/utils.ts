@@ -14,6 +14,7 @@ const SLIPPAGE_LIMIT_EXCEEDED_MESSAGE =
   "Slippage limit exceeded. Increase slippage tolerance and try again.";
 const TRANSACTION_TOO_LARGE_MESSAGE =
   "This route's transaction is too large to submit. Try another route.";
+const SIMULATION_FAILED_MESSAGE = "Transaction simulation failed. Try another route.";
 const POST_APPROVE_ALLOWANCE_MAX_RETRIES = 5;
 const POST_APPROVE_ALLOWANCE_RETRY_DELAY = 2000;
 
@@ -47,6 +48,14 @@ const USER_REJECTED_ERROR_PATTERNS = [
   "ethers-user-denied",
   "rejected the request",
   "request rejected",
+];
+
+const SIMULATION_FAILED_ERROR_PATTERNS = [
+  "simulation failed",
+  "program log",
+  "accountnotinitialized",
+  "custom program error",
+  "error processing instruction",
 ];
 
 const wait = (duration: number) => new Promise((resolve) => setTimeout(resolve, duration));
@@ -184,6 +193,10 @@ export const formatBridgeRpcErrorMessage = (errorMessage: string) => {
     normalizedMessage.includes("transaction is too large to submit")
   ) {
     return TRANSACTION_TOO_LARGE_MESSAGE;
+  }
+
+  if (SIMULATION_FAILED_ERROR_PATTERNS.some((pattern) => normalizedMessage.includes(pattern))) {
+    return SIMULATION_FAILED_MESSAGE;
   }
 
   return errorMessage;

@@ -1,7 +1,8 @@
-import { Outlet, useLocation } from "react-router-dom";
-import { lazy, Suspense, useRef } from "react";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
+import { lazy, Suspense, useEffect, useRef } from "react";
 import UserActions from "./user-actions";
 import LayoutContext from "./context";
+import { applyEntryMode, readEntryMode, searchWithoutEntryMode, subscribeEntryMode } from "@/all-tokens/apply-entry-mode";
 import { useAllTokensStore } from "@/all-tokens/store";
 import useWalletBalances from "@/all-tokens/hooks/use-wallet-balances";
 
@@ -25,6 +26,23 @@ function AllTokensBalanceFetcher() {
 export default function Layout() {
   const containerRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    return subscribeEntryMode(() => {
+      const mode = readEntryMode(window.location.search);
+      if (!mode) return;
+      applyEntryMode(mode);
+      navigate(
+        {
+          pathname: window.location.pathname,
+          search: searchWithoutEntryMode(window.location.search),
+          hash: window.location.hash,
+        },
+        { replace: true }
+      );
+    });
+  }, [navigate]);
 
   const allTokensEnabled = useAllTokensStore((state) => state.enabled);
   const isHomePage = location.pathname === "/";
