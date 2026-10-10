@@ -197,7 +197,7 @@ const PendingItem = ({ className, data, layerzeroData, wallets, toast, evmAccoun
             <img
               src={routeLogo}
               alt=""
-              className="w-[62px] h-[16px] object-center object-contain shrink-0"
+              className="w-[62px] h-[16px] object-left object-contain shrink-0"
             />
           ) : (
             <span className="w-[62px] h-[16px] shrink-0" />
