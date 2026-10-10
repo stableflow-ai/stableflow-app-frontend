@@ -15,7 +15,7 @@ import { csl } from "@/utils/log";
 import { getStableflowIcon } from "@/utils/format/logo";
 import { getLayerzeroProjectService } from "@/services/project-service";
 import TokenIcon from "@/all-tokens/components/token-icon";
-import { getRouterLogo, Service as AllTokensService, ServiceLogoMap as AllTokensServiceLogoMap } from "@/all-tokens/constants";
+import { getRouterLogo } from "@/all-tokens/constants";
 import { useAllTokensStore } from "@/all-tokens/store";
 import { PendingSkeleton, PendingTitleSkeleton } from "./loading";
 
@@ -123,7 +123,7 @@ const PendingItem = ({ className, data, layerzeroData, wallets, toast, evmAccoun
   const allTokensEnabled = useAllTokensStore((state) => state.enabled);
   const historyStore = useHistoryStore();
   const routeLogo = allTokensEnabled
-    ? (getRouterLogo(data.router) || AllTokensServiceLogoMap[AllTokensService.Rhea])
+    ? getRouterLogo(data.rhea_router)
     : getRealService(data.project as TradeProject, { symbol: data.symbol })?.logo;
 
   const wallet = wallets["evm"];
@@ -198,11 +198,15 @@ const PendingItem = ({ className, data, layerzeroData, wallets, toast, evmAccoun
     <div className={clsx("w-full md:w-[300px] bg-[#EDF0F7] rounded-[12px]", className)}>
       <div className="rounded-[12px] bg-white border border-[#EDF0F7] p-[12px] pt-[6px]">
         <div className="mb-2 flex justify-between items-center">
-          <img
-            src={routeLogo}
-            alt=""
-            className="w-[62px] h-[16px] object-center object-contain shrink-0"
-          />
+          {routeLogo ? (
+            <img
+              src={routeLogo}
+              alt=""
+              className="w-[62px] h-[16px] object-center object-contain shrink-0"
+            />
+          ) : (
+            <span className="w-[62px] h-[16px] shrink-0" />
+          )}
           {
             layerzeroData?.needRetry && (
               <button

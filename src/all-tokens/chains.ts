@@ -864,7 +864,7 @@ export const RHEA_NATIVE_TOKEN_IDS: Record<string, string> = {
   plasma: "0x0000000000000000000000000000000000000000",
   sol: "So11111111111111111111111111111111111111112",
   near: "wrap.near",
-  aptos: "0xa",
+  aptos: "0x000000000000000000000000000000000000000000000000000000000000000a",
   tron: "trx",
   sui: "0x2::sui::SUI",
   btc: "btc",

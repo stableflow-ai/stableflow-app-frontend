@@ -157,9 +157,8 @@ export function getRheaNativePrice(fromToken: {
     const byId = tokens.find(
       (t) =>
         t.rheaAlias === alias &&
-        (t.contractAddress === nativeId ||
-          t.assetId === nativeId ||
-          t.contractAddress?.toLowerCase?.() === nativeId.toLowerCase())
+        (sameTokenAddress(t.contractAddress, nativeId) ||
+          sameTokenAddress(t.assetId, nativeId))
     );
     if (byId?.price != null && Number(byId.price) > 0) return Number(byId.price);
   }
@@ -182,11 +181,26 @@ function resolveTokenAlias(token: TokenChain): string {
   );
 }
 
+/** Aptos accepts both `0xa` and the 32-byte padded form as the same address. */
+const sameTokenAddress = (left?: string, right?: string): boolean => {
+  const a = (left || "").trim().toLowerCase();
+  const b = (right || "").trim().toLowerCase();
+  if (!a || !b) return false;
+  if (a === b) return true;
+  const pad = (value: string) => {
+    if (!/^0x[0-9a-f]+$/.test(value)) return value;
+    const hex = value.slice(2);
+    if (hex.length > 64) return value;
+    return hex.padStart(64, "0");
+  };
+  return pad(a) === pad(b);
+};
+
 export function isRheaNativeToken(token: TokenChain, nativeId: string): boolean {
   const addr = (token.contractAddress || "").toLowerCase();
   const asset = (token.assetId || "").toLowerCase();
   const native = nativeId.toLowerCase();
-  if (addr === native || asset === native) return true;
+  if (sameTokenAddress(addr, native) || sameTokenAddress(asset, native)) return true;
 
   const isNativeSymbol =
     !!token.symbol &&
