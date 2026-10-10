@@ -18,13 +18,25 @@ import { OFT_ABI } from "@/services/usdt0/contract";
 import { csl } from "@/utils/log";
 import { createMulticall3, type Call } from "@/utils/multicall3";
 import { ExecTime } from "@/utils/exec-time";
-import { evmRpcFallbackProvider } from "@/utils/evm-rpc-providers";
+import { evmRpcFallbackProvider, getSignedProviderByChainId, isExecutionRevert } from "@/utils/evm-rpc-providers";
 import { FRAXZERO_MIDDLE_TOKEN_FRXUSD, FRAXZERO_MIDDLE_TOKEN_USDC } from "@/services/fraxzero/config";
 
 const DEFAULT_GAS_LIMIT = 100000n;
 const DEFAULT_GAS_LIMIT_FAILED = 4000000n;
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 const EVM_ADDRESS = /^0x[a-fA-F0-9]{40}$/;
+
+function rheaEstimateRevertMessage(error: unknown): string {
+  const err = error as { shortMessage?: unknown; data?: unknown; error?: { data?: unknown } };
+  const short = typeof err?.shortMessage === "string" && err.shortMessage
+    ? err.shortMessage
+    : "execution reverted";
+  const data = err?.data ?? err?.error?.data;
+  const dataText = typeof data === "string" && data.startsWith("0x") && data.length > 2 && !short.includes(data)
+    ? ` data=${data}`
+    : "";
+  return `Transaction failed: ${short}${dataText}`;
+}
 
 /** Native gas token: eth/native symbol, the zero address, or a non-address id whose symbol matches the chain native. */
 function isEvmNativeGasToken(token: any): boolean {
@@ -784,6 +796,10 @@ export default class RainbowWallet {
       request.maxPriorityFeePerGas = BigInt(tx.maxPriorityFeePerGas);
     }
 
+    if (request.gasLimit == null) {
+      request.gasLimit = await this.estimateRheaGasLimit(tx, request);
+    }
+
     try {
       const hash = await this.signer.sendUncheckedTransaction(request);
       return hash;
@@ -794,6 +810,38 @@ export default class RainbowWallet {
         finalErrorMessage = error.message;
       }
       throw new Error(finalErrorMessage);
+    }
+  }
+
+  /**
+   * Estimate on tx.chainId. The signer was built for the wallet's previous chain,
+   * and its eth_estimateGas path keeps that chain after a switch.
+   * A contract revert on the tx chain still blocks the send. A transport failure
+   * uses a fallback gas limit so the wallet can simulate on the switched chain.
+   */
+  private async estimateRheaGasLimit(tx: any, request: Record<string, any>): Promise<bigint> {
+    const chainId = Number(tx?.chainId);
+    const provider = Number.isFinite(chainId) ? getSignedProviderByChainId(chainId) : null;
+    if (!provider) {
+      csl("EVM sendRheaTx", "yellow-600", "no signed RPC for chain %s, using fallback gas", tx?.chainId);
+      return DEFAULT_GAS_LIMIT_FAILED;
+    }
+
+    try {
+      const gasLimit = await provider.estimateGas({
+        to: request.to,
+        data: request.data,
+        value: request.value,
+        from: tx.from || this.signer?.address,
+      });
+      return gasLimit * 120n / 100n;
+    } catch (error) {
+      if (isExecutionRevert(error)) {
+        csl("EVM sendRheaTx", "red-500", "estimateGas reverted on chain %s: %o", chainId, error);
+        throw new Error(rheaEstimateRevertMessage(error));
+      }
+      csl("EVM sendRheaTx", "yellow-600", "estimateGas transport failed on chain %s: %o", chainId, error);
+      return DEFAULT_GAS_LIMIT_FAILED;
     }
   }
 

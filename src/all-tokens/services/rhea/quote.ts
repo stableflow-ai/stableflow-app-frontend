@@ -244,6 +244,8 @@ export async function rheaQuote(params: QuoteParams) {
       slippage: params.slippage ?? 50,
       sender: params.sender,
       quoteWaitingTimeMs: 6000,
+      sameChainTimeoutMs: 1500,
+      crossChainTimeoutMs: 6000,
       ...(params.recipient ? { recipient: params.recipient } : {}),
       ...(appFees ? { appFees } : {}),
     }),
