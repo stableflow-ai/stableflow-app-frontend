@@ -136,3 +136,9 @@ div::-webkit-scrollbar-thumb:hover {
 #launcher {
   display: none !important;
 }
+
+/* All Tokens Select Token is z-80. The Near picker must paint above it. */
+.hot-connector-popup {
+  position: relative;
+  z-index: 100000000;
+}
