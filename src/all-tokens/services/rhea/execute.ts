@@ -17,6 +17,13 @@ export type RheaTxExecutor = (params: {
 
 export type RheaSigner = (signingRequest: unknown) => Promise<Record<string, unknown>>;
 
+export type ConfirmRheaApprove = (params: {
+  chainType: string;
+  hash: string;
+  spender: string;
+  amountWei: string;
+}) => Promise<void>;
+
 const isEmptyTxValue = (value: unknown): boolean => {
   if (value == null) return true;
   const raw = String(value).trim().toLowerCase();
@@ -34,6 +41,13 @@ const withNativeSwapValue = (swap: RheaSwapResponse): RheaSwapTx => {
   return { ...tx, value: swap.amountIn };
 };
 
+const approveSpender = (item: RheaApproveItem): string => {
+  if (item && typeof item === "object" && "spender" in item) {
+    return String((item as { spender?: string }).spender || "").trim();
+  }
+  return "";
+};
+
 /** API returns `{ spender, tx }` or a bare RheaSwapTx */
 const unwrapApproveTx = (item: RheaApproveItem): RheaSwapTx => {
   if (item && typeof item === "object" && "tx" in item) {
@@ -45,18 +59,29 @@ const unwrapApproveTx = (item: RheaApproveItem): RheaSwapTx => {
 
 const runApproves = async (
   swap: RheaSwapResponse,
-  deps: { executeTx: RheaTxExecutor }
+  deps: { executeTx: RheaTxExecutor; confirmApprove?: ConfirmRheaApprove }
 ) => {
   if (!swap.approve) return;
   const fromChain = String(swap.fromChain || "");
   const chainType = String(swap.chainType || "evm");
   const approves = Array.isArray(swap.approve) ? swap.approve : [swap.approve];
   for (const approveItem of approves) {
-    await deps.executeTx({
+    const spender = approveSpender(approveItem);
+    const { hash } = await deps.executeTx({
       chainType,
       fromChain,
       tx: unwrapApproveTx(approveItem),
       approve: null,
+    });
+    const normalizedChain = chainType.toLowerCase();
+    if (!spender || (normalizedChain !== "evm" && normalizedChain !== "tron") || !deps.confirmApprove) {
+      continue;
+    }
+    await deps.confirmApprove({
+      chainType: normalizedChain,
+      hash,
+      spender,
+      amountWei: String(swap.amountIn || ""),
     });
   }
 };
@@ -71,6 +96,7 @@ export async function executeRheaSwapResponse(
   deps: {
     executeTx: RheaTxExecutor;
     signRequest?: RheaSigner;
+    confirmApprove?: ConfirmRheaApprove;
   }
 ): Promise<ExecuteRheaTxResult> {
   const executionType = (swap.executionType || "transaction").toLowerCase();

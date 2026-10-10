@@ -243,7 +243,7 @@ export async function rheaQuote(params: QuoteParams) {
       amountIn: params.amountIn,
       slippage: params.slippage ?? 50,
       sender: params.sender,
-      quoteWaitingTimeMs: 1000,
+      quoteWaitingTimeMs: 6000,
       ...(params.recipient ? { recipient: params.recipient } : {}),
       ...(appFees ? { appFees } : {}),
     }),

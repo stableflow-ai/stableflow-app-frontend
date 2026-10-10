@@ -42,6 +42,47 @@ type JSONArray = JSONValue[];
 type JSONValue = JSONLeaf | JSONObject | JSONArray;
 type JSONContainer = JSONObject | JSONArray;
 
+const TRACK_CONTENT_LIMIT = 5000;
+const TRACK_ERROR_LIMIT = 1500;
+
+/** Keep the revert or reason sentence and drop calldata plus stack frames. */
+const compactTrackedError = (message: string) => {
+  const withoutStack = message.split(/\n\s*at\s+/)[0] ?? message;
+  const withoutCalldata = withoutStack.split(/transaction=\{/i)[0] ?? withoutStack;
+  const reverted = withoutCalldata.match(/execution reverted(?::[^\n.]*)?/i)?.[0];
+  const reason = withoutCalldata.match(/\breason(?:=|:)\s*[^,}\n]+/i)?.[0];
+  const compact = (reverted || reason || withoutCalldata).replace(/\s+/g, " ").trim();
+  return compact.slice(0, TRACK_ERROR_LIMIT);
+};
+
+const compactTrackedContent = (content: string) => {
+  let next = content;
+  try {
+    const parsed = JSON.parse(content) as unknown;
+    const visit = (value: unknown): unknown => {
+      if (Array.isArray(value)) return value.map(visit);
+      if (!value || typeof value !== "object") return value;
+      const record = value as Record<string, unknown>;
+      const nextRecord: Record<string, unknown> = {};
+      for (const [key, child] of Object.entries(record)) {
+        if (
+          (key === "error_message" || key === "source_error_message") &&
+          typeof child === "string"
+        ) {
+          nextRecord[key] = compactTrackedError(child);
+        } else {
+          nextRecord[key] = visit(child);
+        }
+      }
+      return nextRecord;
+    };
+    next = JSON.stringify(visit(parsed));
+  } catch {
+    next = content;
+  }
+  return next.length > TRACK_CONTENT_LIMIT ? next.slice(0, TRACK_CONTENT_LIMIT) : next;
+};
+
 /**
  * Non-hook reporting channel, usable from stores and background tasks.
  * Returns whether the event reached the backend so callers can queue and retry.
@@ -61,6 +102,9 @@ export async function trackEvent(params: TrackParams): Promise<boolean> {
       source: "stableflow",
       session_id: _sessionId,
       ...params,
+      ...(typeof params.content === "string"
+        ? { content: compactTrackedContent(params.content) }
+        : {}),
     });
     return true;
   } catch (error) {

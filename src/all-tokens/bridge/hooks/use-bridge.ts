@@ -21,7 +21,7 @@ import { Service, ServiceBackend } from "@/all-tokens/constants";
 import { useAccount, useSwitchChain } from "wagmi";
 import { csl } from "@/utils/log";
 import { addTradeReport } from "@/stores/use-trade-report";
-import { formatBridgeError, formatRheaQuoteErrorMessage, isReQuoteError, isUserRejectedError, sortQuoteData } from "../utils";
+import { createEvmAllowanceProvider, formatBridgeError, formatRheaQuoteErrorMessage, isReQuoteError, isUserRejectedError, sortQuoteData, verifyPostApproveAllowance } from "../utils";
 import { useTrack } from "@/hooks/use-track";
 import { tokenAddressForQuote, tokenHttpChainId } from "@/all-tokens/services/rhea/tokens";
 import { estimateSourceGasFromTransferResult } from "@/all-tokens/services/rhea/fee";
@@ -605,6 +605,49 @@ export default function useBridge(_props?: any) {
         signRequest: walletEntry.wallet?.signRheaRequest
           ? (req) => walletEntry.wallet.signRheaRequest(req)
           : undefined,
+        confirmApprove: async ({ chainType, hash, spender, amountWei }) => {
+          if (chainType === "evm") {
+            const provider = createEvmAllowanceProvider(fromToken);
+            if (!provider) throw new Error("Missing RPC provider for approval confirmation");
+            const receipt = await provider.waitForTransaction(hash);
+            if (!receipt || receipt.status === 0) {
+              throw new Error("Approval transaction failed");
+            }
+            await verifyPostApproveAllowance({
+              wallet: walletEntry.wallet,
+              chainType: "evm",
+              fromToken,
+              contractAddress: fromToken.contractAddress,
+              spender,
+              address: sender,
+              amountWei,
+              approveResult: {
+                data: { txHash: hash, blockNumber: receipt.blockNumber },
+              },
+            });
+            return;
+          }
+
+          if (chainType === "tron") {
+            if (typeof walletEntry.wallet?.pollingTransactionStatus !== "function") {
+              throw new Error("Approval transaction failed");
+            }
+            const confirmed = await walletEntry.wallet.pollingTransactionStatus(hash, {
+              maxPolls: 120,
+              pollInterval: 2000,
+            });
+            if (!confirmed) throw new Error("Approval transaction failed");
+            await verifyPostApproveAllowance({
+              wallet: walletEntry.wallet,
+              chainType: "tron",
+              fromToken,
+              contractAddress: fromToken.contractAddress,
+              spender,
+              address: sender,
+              amountWei,
+            });
+          }
+        },
       });
 
       const txHash = execResult.txHash || "";

@@ -6,20 +6,33 @@ import { SendType } from "../types";
 import { Service } from "@/services/constants";
 import { csl } from "@/utils/log";
 import { ExecTime } from "@/utils/exec-time";
-import { actionCreators } from "@near-wallet-selector/core";
+import type { NearConnector } from "@hot-labs/near-connect";
 
 const createFunctionCallAction = (
   methodName: string,
   args: Record<string, any>,
   gas: string,
   deposit: string
-) => actionCreators.functionCall(methodName, args, BigInt(gas), BigInt(deposit));
+) => ({
+  type: "FunctionCall" as const,
+  params: {
+    methodName,
+    args,
+    gas: String(gas),
+    deposit: String(deposit),
+  },
+});
+
+const transactionHash = (outcome: {
+  transaction?: { hash?: string };
+  transaction_outcome?: { id?: string };
+}) => outcome?.transaction?.hash || outcome?.transaction_outcome?.id || "";
 
 export default class NearWallet {
-  private selector: any;
+  private connector: NearConnector;
   private rpcUrl: string;
-  constructor(_selector: any) {
-    this.selector = _selector;
+  constructor(connector: NearConnector) {
+    this.connector = connector;
     // https://rpc.mainnet.near.org
     // https://nearinner.deltarpc.com
     this.rpcUrl = "https://nearinner.deltarpc.com";
@@ -56,7 +69,6 @@ export default class NearWallet {
     depositAddress: string;
     amount: string;
   }) {
-    const wallet = await this.selector.wallet();
     const checkStorage = await this.query(
       data.originAsset,
       "storage_balance_of",
@@ -97,16 +109,7 @@ export default class NearWallet {
       ]
     });
 
-    const result = await wallet.signAndSendTransactions({
-      transactions,
-      callbackUrl: "/"
-    });
-
-    if (result.slice(-1).length) {
-      return result.slice(-1)[0].transaction.hash;
-    }
-
-    return "";
+    return this.sendTransaction({ transactions });
   }
 
   async getBalance(token: any, _account: string, options?: { isCatchError?: boolean; }) {
@@ -299,7 +302,7 @@ export default class NearWallet {
   }
 
   async checkTransactionStatus(txHash: string) {
-    const wallet = await this.selector.wallet();
+    const wallet = await this.connector.wallet();
     const accounts = await wallet.getAccounts();
     const accountId = accounts[0]?.accountId;
 
@@ -342,7 +345,7 @@ export default class NearWallet {
     const result: any = { fees: {} };
 
     try {
-      const wallet = await this.selector.wallet();
+      const wallet = await this.connector.wallet();
       const accounts = await wallet.getAccounts();
       const userAccountId = refundTo || accounts[0]?.accountId;
 
@@ -448,23 +451,22 @@ export default class NearWallet {
   }
 
   async sendTransaction(params: any) {
-    const { transactions, callbackUrl } = params;
+    const { transactions } = params;
 
     if (!transactions || !Array.isArray(transactions)) {
       throw new Error("Invalid sendParam: transactions array is required");
     }
 
-    const wallet = await this.selector.wallet();
-    const result = await wallet.signAndSendTransactions({
-      transactions,
-      callbackUrl: callbackUrl || "/"
-    });
-
-    if (result.slice(-1).length) {
-      return result.slice(-1)[0].transaction.hash;
+    const wallet = await this.connector.wallet();
+    let lastHash = "";
+    for (const tx of transactions) {
+      const outcome = await wallet.signAndSendTransaction({
+        receiverId: tx.receiverId,
+        actions: tx.actions,
+      });
+      lastHash = transactionHash(outcome) || lastHash;
     }
-
-    return "";
+    return lastHash;
   }
 
   /**

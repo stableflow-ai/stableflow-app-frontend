@@ -104,9 +104,22 @@ export default function ChainPane({
             </div>
             <span className="text-[13px] font-medium text-[#444C59]">EVM-based</span>
           </div>
-          <span className="text-[12px] text-[#9FA7BA] shrink-0">
-            {formatUsd(evmTotalUsd)}
-          </span>
+          {evmConnected ? (
+            <span className="text-[12px] text-[#9FA7BA] shrink-0">
+              {formatUsd(evmTotalUsd)}
+            </span>
+          ) : (
+            <button
+              type="button"
+              className="button text-[13px] text-[#6284F5] font-medium shrink-0"
+              onClick={(e) => {
+                e.stopPropagation();
+                wallets.evm?.connect?.();
+              }}
+            >
+              Connect
+            </button>
+          )}
         </div>
 
         {evmConnected && (
