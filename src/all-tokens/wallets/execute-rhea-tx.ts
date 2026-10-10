@@ -31,6 +31,8 @@ export async function executeRheaTx(params: ExecuteParams): Promise<{ hash: stri
       await switchChainAsync({ chainId });
     } catch (err) {
       csl("executeRheaTx", "yellow-600", "switch chain failed: %o", err);
+      if (err instanceof Error) throw err;
+      throw new Error("Failed to switch network");
     }
   }
 
