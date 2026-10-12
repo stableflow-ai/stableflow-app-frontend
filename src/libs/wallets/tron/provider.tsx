@@ -13,7 +13,7 @@ import { useWalletSelector } from "../hooks/use-wallet-selector";
 import { getChainRpcUrl } from "@/config/chains";
 import { metadata } from "../rainbow/metadata";
 import { csl } from "@/utils/log";
-import { generateRpcSignature } from "@/libs/signature";
+import { createSignedTronWeb } from "./signed-tronweb";
 import { isInMobileBrowser, isInOKApp, isInTrustWallet } from "../utils/device";
 import { supportsNativeTrustTron, type InjectedTronWalletName } from "./deeplinks";
 import { useInjectedTron } from "./use-injected-tron";
@@ -206,19 +206,13 @@ const Content = ({
 
   const setWindowWallet = (address?: string) => {
     const _address = address || adapter?.address;
-    const _tronWeb = new TronWeb({
-      fullHost: getChainRpcUrl("Tron").rpcUrl,
-      headers: {},
-      privateKey: "",
-    });
+    const _tronWeb = createSignedTronWeb();
     _address && _tronWeb.setAddress(_address);
     walletRef.current = new TronWallet({
       signAndSendTransaction: async (transaction: any) => {
         if (!adapter) {
           return "";
         }
-        const rpcSignature = generateRpcSignature("tron");
-        _tronWeb.setHeader(rpcSignature.headers);
         const signedTx = await adapter.signTransaction(transaction);
         return _tronWeb.trx.sendRawTransaction(signedTx);
       },
