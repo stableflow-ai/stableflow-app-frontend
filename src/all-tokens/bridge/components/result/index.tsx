@@ -41,9 +41,13 @@ const Result = (_props: any) => {
           : "-"}
       </ResultFeeItem>
 
-      <ResultFeeItem label="Time" isFormat={false} loading={isQuoting}>
-        ~{formatDuration(quoteData?.timeEstimate || 0, { compound: true })}
-      </ResultFeeItem>
+      {
+        !!(quoteData?.timeEstimate || quoteData?.estimateTime) && (
+          <ResultFeeItem label="Time" isFormat={false} loading={isQuoting}>
+            ~{formatDuration(quoteData?.timeEstimate || quoteData?.estimateTime || 0, { compound: true })}
+          </ResultFeeItem>
+        )
+      }
 
       {quoteData?.priceImpactUsdPercent != null && (
         <ResultFeeItem label="Price impact" isFormat={false} loading={isQuoting}>
