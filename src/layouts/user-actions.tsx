@@ -7,7 +7,7 @@ import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { useLayoutContext } from "./context";
 import useIsMobile from "@/hooks/use-is-mobile";
 import { stablecoinWithChains } from "@/config/tokens";
-import { useAllTokensStore } from "@/all-tokens/store";
+import { isBridgePath, isHistoryPath, MODE_ROUTES, useIsAllTokens, useRouteMode } from "@/all-tokens/route-mode";
 import { chainTypes as rheaChainTypes, RHEA_WALLET_TYPES } from "@/all-tokens/chains";
 import clsx from "clsx";
 import { menuItems } from "@/components/navigation-menu/menu-items";
@@ -42,9 +42,8 @@ export default function UserActions() {
     return () => el.removeEventListener("scroll", onScroll);
   }, [containerRef]);
 
-  const isHomePage = useMemo(() => pathname === "/", [pathname]);
   const isAppBar = useMemo(() => {
-    return isMobile && ["/", "/history"].includes(pathname);
+    return isMobile && (isBridgePath(pathname) || isHistoryPath(pathname));
   }, [pathname, isMobile]);
 
   const hideActions = useMemo(() => {
@@ -180,7 +179,7 @@ const ChainsButton = ({
   onClick,
 }: any) => {
   const walletsStore = useWalletsStore();
-  const allTokensEnabled = useAllTokensStore((state) => state.enabled);
+  const allTokensEnabled = useIsAllTokens();
 
   const chainsToDisplay = useMemo(() => {
     if (allTokensEnabled) {
@@ -265,6 +264,8 @@ const MobileMenuButton = ({ isOpen, onClick, isSimple = false }: { isOpen: boole
 
 const MobileMenuDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) => {
   const location = useLocation();
+  const mode = useRouteMode();
+  const transferPath = MODE_ROUTES[mode].bridge;
 
   return (
     <>
@@ -348,7 +349,7 @@ const MobileMenuDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: () =>
               }
 
               const isActive = item.path === "/"
-                ? location.pathname === "/"
+                ? isBridgePath(location.pathname)
                 : location.pathname.startsWith(item.path);
 
               if (item.isExternal) {
@@ -372,7 +373,7 @@ const MobileMenuDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: () =>
               return (
                 <Link
                   key={index}
-                  to={item.path}
+                  to={item.path === "/" ? transferPath : item.path}
                   onClick={onClose}
                   className={clsx(
                     "w-full h-[60px] px-4 rounded-lg text-lg text-black text-center font-['SpaceGrotesk'] font-normal hover:bg-[#F5F7FD] transition-colors duration-150 relative flex justify-center items-center",
@@ -410,9 +411,10 @@ const AccountButton = () => {
   const historyStore = useHistoryStore();
   const isMobile = useIsMobile();
   const { pathname } = useLocation();
+  const mode = useRouteMode();
 
   const isHistory = useMemo(() => {
-    return pathname === "/history";
+    return isHistoryPath(pathname);
   }, [pathname]);
 
   const isConnected = useMemo(() => {
@@ -440,7 +442,7 @@ const AccountButton = () => {
                 historyStore.setOpenDrawer(!historyStore.openDrawer);
                 return;
               }
-              navigate("/history");
+              navigate(MODE_ROUTES[mode].history);
             }}
           />
         )}

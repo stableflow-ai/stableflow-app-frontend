@@ -59,6 +59,22 @@ export default function useBridge(_props?: any) {
   const { switchChainAsync } = useSwitchChain();
   const [errorChain, setErrorChain] = useState<number>(0);
   const toast = useToast();
+
+  useEffect(() => {
+    const fromToken = walletStore.fromToken;
+    const fromChainId = Number(fromToken?.chainId);
+    if (fromToken?.chainType !== "evm" || !Number.isFinite(fromChainId)) {
+      setErrorChain(0);
+      return;
+    }
+
+    const walletChainId = wallets.evm?.chainId;
+    const accountChainId = evmAccount.chainId;
+    const walletMismatch = walletChainId == null || Number(walletChainId) !== fromChainId;
+    const accountMismatch = accountChainId != null && Number(accountChainId) !== fromChainId;
+    setErrorChain(walletMismatch || accountMismatch ? fromChainId : 0);
+  }, [walletStore.fromToken, wallets.evm?.chainId, evmAccount.chainId]);
+
   const { addQuote: addQuoteTrack, addTransfer: addTransferTrack } = useTrack();
   const requestIdRef = useRef(0);
 

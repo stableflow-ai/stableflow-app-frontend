@@ -2,7 +2,7 @@ import { BASE_API_URL } from "@/config/api";
 import stableChains from "@/config/chains";
 import rheaChains from "@/all-tokens/chains";
 import { stablecoinLogoMap } from "@/config/tokens";
-import { useAllTokensStore } from "@/all-tokens/store";
+import { useIsAllTokens } from "@/all-tokens/route-mode";
 import { ALL_TOKENS_TRADE_TYPE, STABLECOIN_TRADE_TYPE } from "@/all-tokens/config";
 import { TradeProject, TradeProjectMap } from "@/config/trade";
 import { Service } from "@/services/constants";
@@ -16,7 +16,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 export function usePendingHistory(history?: any) {
   const wallets = useWalletsStore();
   const historyStore = useHistoryStore();
-  const allTokensEnabled = useAllTokensStore((state) => state.enabled);
+  const allTokensEnabled = useIsAllTokens();
   const pendingRefreshNonce = useHistoryStore((state) => state.pendingRefreshNonce);
   const chains = allTokensEnabled ? rheaChains : stableChains;
   const tradeType = allTokensEnabled ? ALL_TOKENS_TRADE_TYPE : STABLECOIN_TRADE_TYPE;

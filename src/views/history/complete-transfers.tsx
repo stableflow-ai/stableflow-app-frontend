@@ -7,7 +7,7 @@ import { TradeStatus, TradeStatusMap } from "@/config/trade";
 import ContinueTransfer from "./continue";
 import { CompleteTransfersSkeleton } from "./loading";
 import TokenIcon from "@/all-tokens/components/token-icon";
-import { useAllTokensStore } from "@/all-tokens/store";
+import { useIsAllTokens } from "@/all-tokens/route-mode";
 
 export default function CompleteTransfers(props: any) {
   const { className, contentClassName, history } = props;
@@ -52,7 +52,7 @@ export default function CompleteTransfers(props: any) {
 }
 
 const CompleteTransferItem = ({ data, isMobile, reload }: any) => {
-  const allTokensEnabled = useAllTokensStore((state) => state.enabled);
+  const allTokensEnabled = useIsAllTokens();
 
   return (
     <div className="flex items-center justify-between border-b border-[#EBF0F8] py-[10px] gap-[10px] min-w-[350px]">

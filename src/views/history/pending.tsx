@@ -16,7 +16,7 @@ import { csl } from "@/utils/log";
 import { getStableflowIcon } from "@/utils/format/logo";
 import TokenIcon from "@/all-tokens/components/token-icon";
 import { getRouterLogo } from "@/all-tokens/constants";
-import { useAllTokensStore } from "@/all-tokens/store";
+import { useIsAllTokens } from "@/all-tokens/route-mode";
 import { PendingSkeleton, PendingTitleSkeleton } from "./loading";
 
 export default function Pending(props: any) {
@@ -115,7 +115,7 @@ export default function Pending(props: any) {
 }
 
 const PendingItem = ({ className, data, layerzeroData, wallets, toast, evmAccount, switchChain, getList }: any) => {
-  const allTokensEnabled = useAllTokensStore((state) => state.enabled);
+  const allTokensEnabled = useIsAllTokens();
   const historyStore = useHistoryStore();
   const routeLogo = allTokensEnabled
     ? getRouterLogo(data.rhea_router)

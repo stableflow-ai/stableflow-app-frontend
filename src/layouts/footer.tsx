@@ -5,6 +5,7 @@ import clsx from "clsx";
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useZendeskContext } from "../components/zendesk-widget";
+import { isBridgePath, isHistoryPath, MODE_ROUTES, useRouteMode } from "@/all-tokens/route-mode";
 
 const Terms = lazy(() => import("../components/terms"));
 
@@ -14,6 +15,9 @@ const Footer = (props: any) => {
   const isMobile = useIsMobile();
   const { pathname } = useLocation();
   const navigate = useNavigate();
+  const mode = useRouteMode();
+  const bridgePath = MODE_ROUTES[mode].bridge;
+  const historyPath = MODE_ROUTES[mode].history;
   const { addHistory } = useTrack();
   const {
     opened: isZendeskOpened,
@@ -24,7 +28,7 @@ const Footer = (props: any) => {
   const [isNearBottom, setIsNearBottom] = useState(false);
 
   const isAppBar = useMemo(() => {
-    return isMobile && ["/", "/history"].includes(pathname);
+    return isMobile && (isBridgePath(pathname) || isHistoryPath(pathname));
   }, [pathname, isMobile]);
 
   useEffect(() => {
@@ -58,11 +62,11 @@ const Footer = (props: any) => {
                 type="button"
                 className={clsx(
                   "cursor-pointer duration-150 backdrop-blur-md h-15 flex-1 flex justify-center items-center gap-2 text-[#444C59] text-base font-normal leading-[100%]",
-                  pathname === "/" ? "bg-[#F7F9FD]" : "bg-white",
+                  pathname === bridgePath ? "bg-[#F7F9FD]" : "bg-white",
                 )}
                 onClick={() => {
-                  if (pathname === "/") return;
-                  navigate("/");
+                  if (pathname === bridgePath) return;
+                  navigate(bridgePath);
                 }}
               >
                 <svg width="16" height="13" viewBox="0 0 16 13" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -76,11 +80,11 @@ const Footer = (props: any) => {
                 type="button"
                 className={clsx(
                   "cursor-pointer duration-150 backdrop-blur-md h-15 flex-1 flex justify-center items-center gap-2 text-[#444C59] text-base font-normal leading-[100%]",
-                  pathname === "/history" ? "bg-[#F7F9FD]" : "bg-white",
+                  pathname === historyPath ? "bg-[#F7F9FD]" : "bg-white",
                 )}
                 onClick={() => {
-                  if (pathname === "/history") return;
-                  navigate("/history");
+                  if (pathname === historyPath) return;
+                  navigate(historyPath);
                   addHistory({ type: "click" });
                 }}
               >

@@ -2,24 +2,27 @@ import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
 type AllTokensState = {
-  enabled: boolean;
   guideDismissed: boolean;
-  setEnabled: (enabled: boolean) => void;
   dismissGuide: () => void;
 };
 
+type PersistedAllTokensState = Pick<AllTokensState, "guideDismissed">;
+
 export const useAllTokensStore = create<AllTokensState>()(
-  persist(
+  persist<AllTokensState, [], [], PersistedAllTokensState>(
     (set) => ({
-      enabled: false,
       guideDismissed: false,
-      setEnabled: (enabled) => set({ enabled }),
       dismissGuide: () => set({ guideDismissed: true }),
     }),
     {
       name: "stableflow.allTokens",
-      version: 1,
+      version: 2,
       storage: createJSONStorage(() => localStorage),
+      partialize: (state) => ({ guideDismissed: state.guideDismissed }),
+      migrate: (persisted) => {
+        const state = persisted as { guideDismissed?: boolean } | undefined;
+        return { guideDismissed: Boolean(state?.guideDismissed) };
+      },
     }
   )
 );

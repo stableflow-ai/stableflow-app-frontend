@@ -33,7 +33,6 @@ import { getQuoteModes } from "@/services/utils";
 import useEvmGasFeesStore from "@/stores/use-evm-gas-fees";
 import { ExecTime } from "@/utils/exec-time";
 import { useTrack } from "@/hooks/use-track";
-import { useAllTokensStore } from "@/all-tokens/store";
 import { formatTemporarySwapLimitMessage } from "@/utils/quote-error";
 
 const TRANSFER_MIN_AMOUNT = import.meta.env.VITE_TRANSFER_MIN_AMOUNT || 1;
@@ -47,7 +46,6 @@ export default function useBridge(props?: any) {
     getEnergy,
   } = useTronEnergy();
   const { debouncedGetList: getPendingList } = usePendingHistory();
-  const allTokensEnabled = useAllTokensStore((state) => state.enabled);
 
   const prices = usePricesStore((state) => state.prices);
   const wallets = useWalletsStore();
@@ -1152,7 +1150,6 @@ export default function useBridge(props?: any) {
   ]);
 
   useEffect(() => {
-    if (allTokensEnabled) return;
     // Only trigger quote if both tokens have selected a specific chain (have chainType)
     // Don't trigger quote when just switching token type (USDT/USDC) without selecting a chain
     if (!walletStore.fromToken?.chainType || !walletStore.toToken?.chainType) {
@@ -1174,7 +1171,6 @@ export default function useBridge(props?: any) {
     // Re-request quote when slippage changes
     configStore.slippage,
     bridgeStore.acceptTronEnergy,
-    allTokensEnabled,
   ]);
 
   // button status check
@@ -1394,7 +1390,7 @@ export default function useBridge(props?: any) {
       clearTimeout(executableQuoteTimerRef.current);
       executableQuoteTimerRef.current = null;
     }
-    if (allTokensEnabled || bridgeStore.transferring) {
+    if (bridgeStore.transferring) {
       return;
     }
 
@@ -1430,7 +1426,6 @@ export default function useBridge(props?: any) {
       }
     };
   }, [
-    allTokensEnabled,
     bridgeStore.transferring,
     bridgeStore.quoteDataMap,
   ]);
