@@ -3,7 +3,7 @@ import { getChainRpcUrl } from "@/config/chains";
 import { generateRpcSignature } from "@/libs/signature";
 import { csl } from "@/utils/log";
 import { getAssociatedTokenAddressSync } from "@solana/spl-token";
-import { Connection, PublicKey } from "@solana/web3.js";
+import { Connection, PublicKey, type ConnectionConfig } from "@solana/web3.js";
 
 const SOLANA_RPC_TIMEOUT_MS = 5000;
 
@@ -41,16 +41,36 @@ export const getActiveSolanaConnection = (connection: Connection): Connection =>
   return (connection as any)?.[ACTIVE_CONNECTION_PROP] ?? connection;
 };
 
+/**
+ * Signs proxy RPC requests on every call. A static header expires and the
+ * node answers 401, which makes the fallback stick on a public endpoint.
+ */
+export const getSolanaConnectionConfig = (rpcUrl: string): ConnectionConfig => {
+  if (!rpcUrl.includes(PROXY_RPC_DOMAIN)) {
+    return { commitment: "confirmed" };
+  }
+
+  return {
+    commitment: "confirmed",
+    fetchMiddleware: (info, init, fetch) => {
+      const { headers } = generateRpcSignature("solana");
+      fetch(info, {
+        ...init,
+        headers: {
+          ...(init?.headers as Record<string, string> | undefined),
+          ...headers,
+        },
+      });
+    },
+  };
+};
+
 export const createSolanaFallbackConnection = (rpcUrls: string[]) => {
   if (!rpcUrls?.length) {
     throw new Error("No Solana RPC URLs configured");
   }
 
-  const rpcSignature = generateRpcSignature("solana");
-  const connections = rpcUrls.map((rpcUrl) => new Connection(rpcUrl, {
-    commitment: "confirmed",
-    httpHeaders: rpcSignature.headers as any,
-  }));
+  const connections = rpcUrls.map((rpcUrl) => new Connection(rpcUrl, getSolanaConnectionConfig(rpcUrl)));
   let activeIndex = 0;
   let active: Connection = connections[activeIndex];
 

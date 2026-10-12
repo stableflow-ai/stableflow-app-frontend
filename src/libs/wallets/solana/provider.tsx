@@ -22,8 +22,7 @@ import { useWalletSelector } from "../hooks/use-wallet-selector";
 import WalletSelector from "../components/wallet-selector";
 import SolanaWalletSelectorProvider, { useSolanaWalletModal } from "./wallet-selector";
 import { getChainRpcUrl } from "@/config/chains";
-import { getAvailableSolanaRpcUrl } from "../utils/solana";
-import { generateRpcSignature } from "@/libs/signature";
+import { getAvailableSolanaRpcUrl, getSolanaConnectionConfig } from "../utils/solana";
 
 export const adapters = [
   new SolflareWalletAdapter(),
@@ -50,18 +49,18 @@ export default function SolanaProvider({
 }) {
   // Wallet order configuration: Solflare first, Phantom second
   const walletOrder = ["Solflare", "Phantom"];
-  const [endpoint, setEndpoint] = useState(getChainRpcUrl("Solana").rpcUrls[0]);
-  const [endpointConfig, setEndpointConfig] = useState<any>({ commitment: "confirmed" });
+  const initialRpcUrl = getChainRpcUrl("Solana").rpcUrls[0];
+  const [endpoint, setEndpoint] = useState(initialRpcUrl);
+  const [endpointConfig, setEndpointConfig] = useState<any>(getSolanaConnectionConfig(initialRpcUrl));
 
   useEffect(() => {
     let mounted = true;
     const resolveEndpoint = async () => {
       try {
         const availableRpcUrl = await getAvailableSolanaRpcUrl();
-        const rpcSignature = generateRpcSignature("solana");
         if (mounted) {
           setEndpoint(availableRpcUrl);
-          setEndpointConfig({ commitment: "confirmed", httpHeaders: rpcSignature.headers });
+          setEndpointConfig(getSolanaConnectionConfig(availableRpcUrl));
         }
       } catch (_error) {
         // keep default primary rpc url
