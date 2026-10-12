@@ -1,14 +1,15 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import SuiWallet from "@/libs/wallets/sui/wallet";
 import useWalletsStore from "@/stores/use-wallets";
 import useBalancesStore from "@/stores/use-balances";
 import { useDebounceFn } from "ahooks";
 import { useWalletSelector } from "../hooks/use-wallet-selector";
 import WalletSelector from "../components/wallet-selector";
-import { suiDAppKit } from "./dapp-kit";
+import { SUI_DAPP_KIT_STORAGE_KEY, suiDAppKit } from "./dapp-kit";
 
 import {
   DAppKitProvider,
+  getWalletUniqueIdentifier,
   useCurrentWallet,
   useDAppKit,
   useWallets,
@@ -53,6 +54,27 @@ const Content = () => {
   const currentWallet = useCurrentWallet()
 
   const account = useCurrentAccount();
+  const restoreAttemptedRef = useRef(false);
+
+  useEffect(() => {
+    if (restoreAttemptedRef.current) return;
+    const saved = localStorage.getItem(SUI_DAPP_KIT_STORAGE_KEY);
+    if (!saved) {
+      restoreAttemptedRef.current = true;
+      return;
+    }
+    const [savedWalletId, savedAddress] = saved.split(":");
+    const wallet = wallets.find(
+      (item) => getWalletUniqueIdentifier(item).replace(":", "_") === savedWalletId
+    );
+    if (!wallet) return;
+    restoreAttemptedRef.current = true;
+    const savedAccount = wallet.accounts.find((item) => item.address === savedAddress);
+    // `silent` is omitted from ConnectWalletArgs but forwarded to standard:connect at runtime.
+    connect({ wallet, account: savedAccount, silent: true } as Parameters<typeof connect>[0]).catch(() => {
+      localStorage.removeItem(SUI_DAPP_KIT_STORAGE_KEY);
+    });
+  }, [wallets]);
 
   const [installedWallets, uninstalledWallets] = useMemo(() => {
     const _installedWallets = [];
