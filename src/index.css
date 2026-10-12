@@ -1,4 +1,6 @@
 @import "tailwindcss";
+@source "../node_modules/@stableflow/pay-ui/dist";
+@source "../node_modules/@stableflow/pay-widgets/dist";
 @import "swiper/css";
 @import "swiper/css/navigation";
 @import "swiper/css/pagination";
