@@ -66,22 +66,28 @@ const QuoteRoute = (props: any) => {
         )}
       </div>
       <div className="flex items-center justify-end gap-1.5 md:gap-2.5 text-xs font-normal text-[#444C59] leading-[100%]">
-        <div className="flex items-center gap-[4px]">
-          <img
-            src={getStableflowIcon("icon-time.svg")}
-            alt=""
-            className="w-[14px] h-[14px] object-center object-contain shrink-0"
-          />
-          <div
-            className={clsx(
-              estimateTime > 300 && "text-[#E53935]",
-              estimateTime > 60 && estimateTime <= 300 && "text-[#F9A825]",
-            )}
-          >
-            ~{formatDuration(estimateTime, { compound: true })}
-          </div>
-        </div>
-        <div className="w-[1px] h-[14px] bg-[#B3BBCE] shrink-0" />
+        {
+          !!estimateTime && (
+            <>
+              <div className="flex items-center gap-[4px]">
+                <img
+                  src={getStableflowIcon("icon-time.svg")}
+                  alt=""
+                  className="w-[14px] h-[14px] object-center object-contain shrink-0"
+                />
+                <div
+                  className={clsx(
+                    estimateTime > 300 && "text-[#E53935]",
+                    estimateTime > 60 && estimateTime <= 300 && "text-[#F9A825]",
+                  )}
+                >
+                  ~{formatDuration(estimateTime, { compound: true })}
+                </div>
+              </div>
+              <div className="w-[1px] h-[14px] bg-[#B3BBCE] shrink-0" />
+            </>
+          )
+        }
         <div className="flex items-center gap-[4px]">
           <TokenIcon
             src={data?.quoteParam?.toToken?.icon}

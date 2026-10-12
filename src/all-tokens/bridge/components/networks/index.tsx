@@ -288,7 +288,7 @@ export default function Networks({ addressValidation, onRefreshQuote, isRoutes =
               <div className="flex items-center gap-2 text-xs text-[#444C59] leading-[100%] font-normal font-['SpaceGrotesk']">
                 <AnimatePresence>
                   {
-                    !isRoutes && (
+                    !isRoutes && !!(quoteData?.timeEstimate || quoteData?.estimateTime) && (
                       <motion.div
                         className={clsx("flex items-center gap-4")}
                         initial={{ opacity: 0 }}
