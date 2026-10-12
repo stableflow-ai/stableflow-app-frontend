@@ -1,18 +1,20 @@
-import { useAllTokensStore } from "@/all-tokens/store";
-import { useHistoryStore } from "@/stores/use-history";
+import { isHistoryPath, MODE_ROUTES, useIsAllTokens } from "@/all-tokens/route-mode";
 import { motion, useReducedMotion } from "framer-motion";
+import { useLocation, useNavigate } from "react-router-dom";
 
 const TRACK_OFF = "#B3BBCE";
 const TRACK_ON = "#6284F5";
 
 export default function AllTokensSwitch() {
-  const enabled = useAllTokensStore((state) => state.enabled);
+  const enabled = useIsAllTokens();
   const reduceMotion = useReducedMotion();
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
 
   const onToggle = () => {
-    const next = !enabled;
-    useAllTokensStore.getState().setEnabled(next);
-    useHistoryStore.getState().activate(next ? "allTokens" : "stablecoin");
+    const next = enabled ? "stablecoin" : "allTokens";
+    const target = isHistoryPath(pathname) ? MODE_ROUTES[next].history : MODE_ROUTES[next].bridge;
+    navigate(target);
   };
 
   const transition = reduceMotion

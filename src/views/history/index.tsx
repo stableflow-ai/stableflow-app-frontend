@@ -6,7 +6,7 @@ import { usePendingHistory } from "./hooks/use-pending-history";
 import { useTrack } from "@/hooks/use-track";
 import { useEffect } from "react";
 import AllTokensSwitch from "@/all-tokens/components/all-tokens-switch";
-import { useAllTokensStore } from "@/all-tokens/store";
+import { useIsAllTokens } from "@/all-tokens/route-mode";
 import { useRheaTokens } from "@/all-tokens/hooks/use-rhea-tokens";
 import { useMaintenanceStore } from "@/stores/use-maintenance";
 import clsx from "clsx";
@@ -21,7 +21,7 @@ export default function History() {
   const pendingHistory = usePendingHistory(history);
   const { addHistory } = useTrack();
   const bannerVisible = useMaintenanceStore((s) => s.getBannerVisible());
-  const allTokensEnabled = useAllTokensStore((state) => state.enabled);
+  const allTokensEnabled = useIsAllTokens();
 
   useEffect(() => {
     addHistory({ type: "view" });

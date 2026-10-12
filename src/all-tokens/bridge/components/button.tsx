@@ -1,7 +1,9 @@
 import Button from "@/components/button";
 import chains from "@/all-tokens/chains";
+import { formatBridgeError } from "@/all-tokens/bridge/utils";
 import useBridgeStore from "@/all-tokens/bridge-store";
 import useWalletStore from "@/all-tokens/wallet-store";
+import useToast from "@/hooks/use-toast";
 import useWalletsStore from "@/stores/use-wallets";
 import { useMemo } from "react";
 import { useSwitchChain } from "wagmi";
@@ -15,6 +17,7 @@ export default function BridgeButton({
   errorChain: number;
 }) {
   const bridgeStore = useBridgeStore();
+  const toast = useToast();
   const { switchChainAsync } = useSwitchChain();
   const wallets = useWalletsStore();
   const walletStore = useWalletStore();
@@ -44,7 +47,7 @@ export default function BridgeButton({
   }, [bridgeStore.errorTips, errorChain, errorConnect, walletStore.fromToken]);
 
   const buttonDisabled = useMemo(() => {
-    if (errorConnect) return false;
+    if (errorConnect || errorChain) return false;
     if (
       !!bridgeStore.errorTips ||
       !bridgeStore.quoteDataService ||
@@ -57,6 +60,7 @@ export default function BridgeButton({
     return false;
   }, [
     errorConnect,
+    errorChain,
     bridgeStore.errorTips,
     loading,
     bridgeStore.quoteDataService,
@@ -69,14 +73,15 @@ export default function BridgeButton({
       disabled={buttonDisabled}
       loading={loading}
       className="w-full h-14 mt-4.5 rounded-xl bg-[#6284F5] shadow-[0_2px_6px_0_rgba(0,0,0,0.10)] text-white text-lg! font-medium!"
-      onClick={() => {
+      onClick={async () => {
         if (errorConnect) {
           wallet?.connect?.();
           return;
         }
         if (!!bridgeStore.errorTips) return;
         if (errorChain) {
-          const targetChain = Object.values(chains).find((chain) => chain.chainId === errorChain);
+          const chainId = Number(errorChain);
+          const targetChain = Object.values(chains).find((chain) => Number(chain.chainId) === chainId);
           let addEthereumChainParameter;
           if (targetChain) {
             addEthereumChainParameter = {
@@ -90,10 +95,16 @@ export default function BridgeButton({
               blockExplorerUrls: targetChain.blockExplorerUrls,
             };
           }
-          switchChainAsync({
-            chainId: errorChain,
-            addEthereumChainParameter,
-          });
+          try {
+            await switchChainAsync({
+              chainId,
+              addEthereumChainParameter,
+            });
+          } catch (error) {
+            toast.fail({
+              title: formatBridgeError(error, "Failed to switch network"),
+            });
+          }
           return;
         }
         onClick();

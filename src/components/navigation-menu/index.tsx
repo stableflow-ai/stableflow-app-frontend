@@ -4,12 +4,15 @@ import { getStableflowLogo } from "@/utils/format/logo";
 import Popover from "../popover";
 import { lazy, Suspense, useRef } from "react";
 import { menuItems } from "./menu-items";
+import { isBridgePath, MODE_ROUTES, useRouteMode } from "@/all-tokens/route-mode";
 
 const Social = lazy(() => import("@/components/social"));
 const HyperliquidDeposit = lazy(() => import("@/components/navigation-menu/hyper-liquid"));
 
 export default function NavigationMenu() {
   const location = useLocation();
+  const mode = useRouteMode();
+  const transferPath = MODE_ROUTES[mode].bridge;
 
   const popoverRef = useRef<any>(null);
 
@@ -90,7 +93,7 @@ export default function NavigationMenu() {
           }
 
           const isActive = item.path === "/"
-            ? location.pathname === "/"
+            ? isBridgePath(location.pathname)
             : location.pathname.startsWith(item.path);
 
           if (item.isExternal) {
@@ -113,7 +116,7 @@ export default function NavigationMenu() {
           return (
             <Link
               key={index}
-              to={item.path}
+              to={item.path === "/" ? transferPath : item.path}
               className={clsx(
                 "text-[14px] md:text-[15px] hover:text-black font-normal transition-colors duration-150 relative",
                 isActive ? "text-black" : "text-[#444C59]",

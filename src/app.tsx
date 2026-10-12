@@ -13,6 +13,7 @@ import { usePrices } from "./hooks/use-prices";
 import { useTradeReport } from "./hooks/use-trade-report";
 import { useSolanaBroadcastReport } from "./hooks/use-solana-broadcast-report";
 import ZendeskPrivider from "./components/zendesk-widget";
+import { bindHistoryModeToRouter } from "./all-tokens/route-mode";
 
 const Bridge = lazy(() => import("./views/bridge"));
 const History = lazy(() => import("./views/history"));
@@ -40,6 +41,19 @@ const router = createBrowserRouter([
       {
         path: "history",
         element: <History />
+      },
+      {
+        path: "all-tokens",
+        children: [
+          {
+            index: true,
+            element: <Bridge />
+          },
+          {
+            path: "history",
+            element: <History />
+          },
+        ]
       },
       {
         path: "apply",
@@ -81,6 +95,8 @@ const router = createBrowserRouter([
     element: <Navigate to="/" replace />
   }
 ]);
+
+bindHistoryModeToRouter(router);
 
 function App() {
   usePrices();

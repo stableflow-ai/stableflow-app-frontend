@@ -1,6 +1,7 @@
 import { Suspense, lazy, useEffect, useState } from "react";
 import useBridge from "./hooks/use-bridge";
 import { useRheaTokens } from "@/all-tokens/hooks/use-rhea-tokens";
+import { usePendingHistory } from "@/views/history/hooks/use-pending-history";
 
 const Networks = lazy(() => import("./components/networks"));
 const BridgeButton = lazy(() => import("./components/button"));
@@ -10,6 +11,7 @@ const TokenSelectModal = lazy(() => import("./components/token-select-modal"));
 
 export default function AllTokensBridge() {
   useRheaTokens();
+  usePendingHistory();
   const { onTransfer, addressValidation, errorChain, onRefreshQuote } = useBridge();
   const [isRoutes, setIsRoutes] = useState(false);
 

@@ -1,8 +1,10 @@
 import clsx from "clsx";
 import { useNavigate } from "react-router-dom";
+import { MODE_ROUTES, useRouteMode } from "@/all-tokens/route-mode";
 
 export default function BackButton({ className }: { className: string }) {
   const navigate = useNavigate();
+  const mode = useRouteMode();
   return (
     <button
       className={clsx(
@@ -10,7 +12,7 @@ export default function BackButton({ className }: { className: string }) {
         className
       )}
       onClick={() => {
-        navigate("/");
+        navigate(MODE_ROUTES[mode].bridge);
       }}
     >
       <svg
