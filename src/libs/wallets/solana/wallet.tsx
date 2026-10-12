@@ -60,6 +60,10 @@ import { type SolanaBroadcastContext } from "@/stores/use-solana-broadcast-repor
 import { removeOftDust } from "../utils/oft";
 import { ExecTime } from "@/utils/exec-time";
 
+/** Solana packet payload limit. Larger transactions fail inside the wallet before the approval prompt. */
+const SOLANA_PACKET_DATA_SIZE = 1232;
+const TRANSACTION_TOO_LARGE_MESSAGE = "This route's transaction is too large to submit. Try another route.";
+
 /** Only used when the compute unit simulation is unavailable. */
 const SOL_TRANSFER_FALLBACK_UNITS = 50_000;
 const TOKEN_TRANSFER_FALLBACK_UNITS = 100_000;
@@ -1232,6 +1236,96 @@ export default class SolanaWallet {
   }
 
   /**
+   * Some swap responses list address lookup tables but serialize every account inline.
+   * Rebuild the v0 message from those tables when it shrinks the packet enough for wallets
+   * that append their own instruction before showing the approval prompt.
+   */
+  private async recompileRheaTransactionWithLookupTables(
+    transaction: Transaction | VersionedTransaction,
+    tx: any,
+    rawLength: number,
+  ): Promise<Transaction | VersionedTransaction> {
+    const payer = this.publicKey;
+    if (!(transaction instanceof VersionedTransaction) || !payer) {
+      return transaction;
+    }
+
+    const message = transaction.message as {
+      addressTableLookups?: readonly unknown[];
+      staticAccountKeys?: PublicKey[];
+      recentBlockhash?: string;
+    };
+    if (!message.addressTableLookups || message.addressTableLookups.length > 0) {
+      return transaction;
+    }
+
+    const altAddresses = tx?.addressLookupTableAddresses;
+    const rawInstructions = tx?.instructions;
+    if (!Array.isArray(altAddresses) || altAddresses.length === 0) return transaction;
+    if (!Array.isArray(rawInstructions) || rawInstructions.length === 0) return transaction;
+
+    const feePayer = message.staticAccountKeys?.[0];
+    if (!feePayer?.equals(payer)) return transaction;
+
+    let instructions: TransactionInstruction[];
+    try {
+      instructions = rawInstructions.map((raw: any) => {
+        if (!raw?.programId || !Array.isArray(raw.accounts)) {
+          throw new Error("Invalid Solana instruction");
+        }
+        return new TransactionInstruction({
+          programId: new PublicKey(raw.programId),
+          data: Buffer.from(typeof raw.data === "string" ? raw.data : "", "base64"),
+          keys: raw.accounts.map((account: any) => ({
+            pubkey: new PublicKey(account.pubkey),
+            isSigner: !!account.isSigner,
+            isWritable: !!account.isWritable,
+          })),
+        });
+      });
+    } catch (error) {
+      csl("Solana sendRheaTx", "yellow-600", "skip lookup table recompile, invalid instructions: %o", error);
+      return transaction;
+    }
+
+    const payerIsSigner = instructions.some((instruction) =>
+      instruction.keys.some((key) => key.isSigner && key.pubkey.equals(payer))
+    );
+    if (!payerIsSigner) return transaction;
+
+    const recentBlockhash = message.recentBlockhash || tx?.recentBlockhash;
+    if (!recentBlockhash) return transaction;
+
+    const lookupTables = await fetchLookupTableAccounts({
+      connection: this.getConnection(),
+      addresses: altAddresses,
+    });
+    if (!lookupTables.length) return transaction;
+
+    try {
+      const compiled = new TransactionMessage({
+        payerKey: payer,
+        recentBlockhash,
+        instructions,
+      }).compileToV0Message(lookupTables);
+      const rebuilt = new VersionedTransaction(compiled);
+      const rebuiltSize = rebuilt.serialize().length;
+      if (rebuiltSize >= rawLength) return transaction;
+      csl(
+        "Solana sendRheaTx",
+        "green-400",
+        "recompiled with address lookup tables: %o -> %o bytes",
+        rawLength,
+        rebuiltSize,
+      );
+      return rebuilt;
+    } catch (error) {
+      csl("Solana sendRheaTx", "yellow-600", "lookup table recompile failed, using original transaction: %o", error);
+      return transaction;
+    }
+  }
+
+  /**
    * Sign and send a Rhea Solana tx payload (base64 serialized transaction).
    */
   async sendRheaTx(tx: any) {
@@ -1246,16 +1340,22 @@ export default class SolanaWallet {
     }
 
     const raw = Buffer.from(serialized, "base64");
-    // Solana rejects packets larger than 1232 bytes. Serialize then throws
-    // "encoding overruns Uint8Array" inside the wallet.
-    if (raw.length > 1232) {
-      throw new Error("This route's transaction is too large to submit. Try another route.");
-    }
     let transaction: Transaction | VersionedTransaction;
     try {
       transaction = VersionedTransaction.deserialize(raw);
     } catch {
       transaction = Transaction.from(raw);
+    }
+
+    transaction = await this.recompileRheaTransactionWithLookupTables(transaction, tx, raw.length);
+
+    const packetSize = transaction instanceof VersionedTransaction
+      ? transaction.serialize().length
+      : raw.length;
+    // Solana rejects packets larger than 1232 bytes. Serialize then throws
+    // "encoding overruns Uint8Array" inside the wallet.
+    if (packetSize > SOLANA_PACKET_DATA_SIZE) {
+      throw new Error(TRANSACTION_TOO_LARGE_MESSAGE);
     }
 
     return this.sendTransaction({ transaction });
