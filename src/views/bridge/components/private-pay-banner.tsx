@@ -79,7 +79,7 @@ function PrivatePayLock() {
       viewBox="0 0 86 86"
       fill="none"
       aria-hidden
-      className="z-10 -mx-5 shrink-0"
+      className="z-10 -mx-6 shrink-0 size-26"
     >
       <g filter="url(#privatePayLockShadow)">
         <rect x="20" y="20" width="46" height="46" rx="12" fill="url(#privatePayLockFill)" />
