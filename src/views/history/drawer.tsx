@@ -6,6 +6,13 @@ import clsx from "clsx";
 import useIsMobile from "@/hooks/use-is-mobile";
 import { useHistory } from "./hooks/use-history";
 import { usePendingHistory } from "./hooks/use-pending-history";
+import { useIsAllTokens } from "@/all-tokens/route-mode";
+import { useRheaTokens } from "@/all-tokens/hooks/use-rhea-tokens";
+
+function AllTokensHistoryTokens() {
+  useRheaTokens();
+  return null;
+}
 
 const HistoryDrawer = (props: any) => {
   const { openDrawer, setOpenDrawer, pendingStatus } = useHistoryStore();
@@ -28,12 +35,14 @@ export default HistoryDrawer;
 
 const HistoryContent = (props: any) => {
   const { className } = props;
+  const allTokensEnabled = useIsAllTokens();
 
   const history = useHistory();
   const pendingHistory = usePendingHistory(history);
 
   return (
     <div className={clsx("h-[calc(100%-60px)] overflow-y-auto", className)}>
+      {allTokensEnabled ? <AllTokensHistoryTokens /> : null}
       <Pending
         isTitle={false}
         className="!shadow-[unset] !mt-0 !border-[0] !pt-[0px] !pb-[20px] !px-[16px]"

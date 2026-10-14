@@ -3,8 +3,6 @@ import { numberRemoveEndZero } from "@/utils/format/number";
 import { getPrice } from "@/utils/format/price";
 import { ethers } from "ethers";
 import Big from "big.js";
-import { TronWeb } from "tronweb";
-import { getChainRpcUrl } from "@/config/chains";
 import { BridgeDefaultWallets } from "@/config";
 import { SendType } from "../types";
 import { Service } from "@/services/constants";
@@ -15,14 +13,10 @@ import { getDestinationAssociatedTokenAddress } from "../utils/solana";
 import { csl } from "@/utils/log";
 import { NATIVE_MSG_FEE_BUFFER } from "../utils/layerzero";
 import { ExecTime } from "@/utils/exec-time";
-import { generateRpcSignature } from "@/libs/signature";
+import { createSignedTronWeb } from "./signed-tronweb";
 
 const DefaultTronWalletAddress = BridgeDefaultWallets["tron"];
-const customTronWeb = new TronWeb({
-  fullHost: getChainRpcUrl("Tron").rpcUrl,
-  headers: {},
-  privateKey: "",
-});
+const customTronWeb = createSignedTronWeb();
 
 export default class TronWallet {
   private signAndSendTransaction: any;
@@ -42,8 +36,6 @@ export default class TronWallet {
       if (this.tronWeb) {
         const address = this.tronWeb.defaultAddress.base58 || DefaultTronWalletAddress;
         customTronWeb.setAddress(address);
-        const rpcSignature = generateRpcSignature("tron");
-        customTronWeb.setHeader(rpcSignature.headers);
         this.tronWeb = customTronWeb;
         resolve(this.tronWeb);
         return;
@@ -54,8 +46,6 @@ export default class TronWallet {
           this.tronWeb = (window as any).tronWeb;
           const address = this.tronWeb.defaultAddress.base58 || DefaultTronWalletAddress;
           customTronWeb.setAddress(address);
-          const rpcSignature = generateRpcSignature("tron");
-          customTronWeb.setHeader(rpcSignature.headers);
           this.tronWeb = customTronWeb;
           resolve(this.tronWeb);
         } else {
@@ -67,8 +57,6 @@ export default class TronWallet {
 
       setTimeout(() => {
         customTronWeb.setAddress(DefaultTronWalletAddress);
-        const rpcSignature = generateRpcSignature("tron");
-        customTronWeb.setHeader(rpcSignature.headers);
         this.tronWeb = customTronWeb;
         resolve(this.tronWeb);
         csl("TronWallet waitForTronWeb", "red-500", "TronWeb initialization timeout");
@@ -930,6 +918,47 @@ export default class TronWallet {
   }
 
   /**
+   * Sign and send a Rhea Tron tx payload ({ kind: tron_transfer, amount, depositAddress, tokenAddress }).
+   * Amount is in sun / token smallest units from Rhea — do not run toSun again for TRX.
+   */
+  async sendRheaTx(tx: any): Promise<string> {
+    const kind = String(tx?.kind || "").toLowerCase();
+    if (kind !== "tron_transfer") {
+      throw new Error(`Unsupported Tron Rhea tx kind: ${tx?.kind}`);
+    }
+
+    const to = tx.depositAddress || tx.to;
+    if (!to) {
+      throw new Error("Invalid Rhea Tron tx: missing depositAddress");
+    }
+
+    const amount = tx.amount;
+    if (amount == null || amount === "") {
+      throw new Error("Invalid Rhea Tron tx: missing amount");
+    }
+
+    await this.waitForTronWeb();
+
+    const tokenAddress = tx.tokenAddress;
+    const standard = String(tx.standard || "").toLowerCase();
+    const isNative =
+      !tokenAddress ||
+      tokenAddress === "TRX" ||
+      tokenAddress === "trx" ||
+      standard === "trx";
+
+    if (isNative) {
+      const transaction = await this.tronWeb.transactionBuilder.sendTrx(
+        to,
+        Number(amount)
+      );
+      return this.sendTransaction({ tx: { transaction } });
+    }
+
+    return this.transferToken(tokenAddress, to, String(amount));
+  }
+
+  /**
    * Unified send method that routes to specific send methods based on type
    * @param type Send type from SendType enum
    * @param params Parameters for the send transaction
@@ -954,7 +983,6 @@ export default class TronWallet {
       refundTo,
       depositAddress,
       amountWei,
-      prices,
     } = params;
 
     const result: any = { fees: {} };
@@ -1013,35 +1041,7 @@ export default class TronWallet {
     const tx = await this.tronWeb.transactionBuilder.triggerSmartContract(...transactionParams);
     execTime.log("transactionBuilder.triggerSmartContract");
     result.sendParam.tx = tx;
-
-    execTime.breakpoint();
-    const ett = await this.estimateTransaction({
-      dry,
-      transactionParams,
-      fromToken,
-      prices,
-      defaultEnergyUsed: 200000,
-      defaultRawDataHexLength: 500,
-    });
-    execTime.log("estimateTransaction");
-    result.fees.estimateGasUsd = ett.estimateSourceGasUsd;
-    result.estimateSourceGas = ett.estimateSourceGas;
-    result.totalEstimateSourceGas = ett.estimateSourceGas;
-    result.estimateSourceGasUsd = ett.estimateSourceGasUsd;
-
-    if (result.needApprove) {
-      execTime.breakpoint();
-      const estApproveGas = await this.estimateApprove({
-        dry,
-        amountWei,
-        spender: result.approveSpender,
-        fromToken,
-        prices,
-      });
-      result.estimateApproveGas = estApproveGas.estimateSourceGas;
-      execTime.log("estimateApprove");
-    }
-
+    // Gas simulation runs after the quote is shown. The unsigned tx already carries fee_limit.
     result.sendParam.transactionParams = transactionParams;
 
     execTime.logTotal("quoteOneClickPorxy");

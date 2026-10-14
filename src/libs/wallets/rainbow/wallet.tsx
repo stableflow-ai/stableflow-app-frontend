@@ -18,11 +18,39 @@ import { OFT_ABI } from "@/services/usdt0/contract";
 import { csl } from "@/utils/log";
 import { createMulticall3, type Call } from "@/utils/multicall3";
 import { ExecTime } from "@/utils/exec-time";
-import { evmRpcFallbackProvider } from "@/utils/evm-rpc-providers";
+import { evmRpcFallbackProvider, getSignedProviderByChainId, isExecutionRevert } from "@/utils/evm-rpc-providers";
 import { FRAXZERO_MIDDLE_TOKEN_FRXUSD, FRAXZERO_MIDDLE_TOKEN_USDC } from "@/services/fraxzero/config";
 
 const DEFAULT_GAS_LIMIT = 100000n;
 const DEFAULT_GAS_LIMIT_FAILED = 4000000n;
+const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+const EVM_ADDRESS = /^0x[a-fA-F0-9]{40}$/;
+
+function rheaEstimateRevertMessage(error: unknown): string {
+  const err = error as { shortMessage?: unknown; data?: unknown; error?: { data?: unknown } };
+  const short = typeof err?.shortMessage === "string" && err.shortMessage
+    ? err.shortMessage
+    : "execution reverted";
+  const data = err?.data ?? err?.error?.data;
+  const dataText = typeof data === "string" && data.startsWith("0x") && data.length > 2 && !short.includes(data)
+    ? ` data=${data}`
+    : "";
+  return `Transaction failed: ${short}${dataText}`;
+}
+
+/** Native gas token: eth/native symbol, the zero address, or a non-address id whose symbol matches the chain native. */
+function isEvmNativeGasToken(token: any): boolean {
+  const symbol = String(token?.symbol || "");
+  if (symbol === "eth" || symbol === "ETH" || symbol === "native") return true;
+
+  const address = String(token?.contractAddress || "").trim();
+  if (address.toLowerCase() === ZERO_ADDRESS) return true;
+
+  const nativeSymbol = token?.nativeToken?.symbol;
+  return !!nativeSymbol
+    && symbol.toLowerCase() === String(nativeSymbol).toLowerCase()
+    && !EVM_ADDRESS.test(address);
+}
 
 export default class RainbowWallet {
   provider: any;
@@ -66,7 +94,7 @@ export default class RainbowWallet {
         provider = evmRpcFallbackProvider(token);
       }
 
-      if (token.symbol === "eth" || token.symbol === "ETH" || token.symbol === "native") {
+      if (isEvmNativeGasToken(token)) {
         const balance = await provider.getBalance(account);
         return balance.toString();
       }
@@ -717,6 +745,78 @@ export default class RainbowWallet {
   }
 
   /**
+   * Sign and send a Rhea EVM tx payload ({ to, data, value, gasLimit }).
+   * Stablecoin contract calls stay on sendTransaction.
+   */
+  async sendRheaTx(tx: any) {
+    if (!tx?.to) {
+      throw new Error("Invalid Rhea tx: missing to");
+    }
+    const request: Record<string, any> = {
+      to: tx.to,
+      data: tx.data || "0x",
+      value: tx.value != null && tx.value !== "" ? ethers.toBigInt(tx.value) : 0n,
+    };
+    if (tx.gasLimit != null && tx.gasLimit !== "") {
+      request.gasLimit = BigInt(tx.gasLimit);
+    }
+    if (tx.maxFeePerGas != null && tx.maxFeePerGas !== "") {
+      request.maxFeePerGas = BigInt(tx.maxFeePerGas);
+    }
+    if (tx.maxPriorityFeePerGas != null && tx.maxPriorityFeePerGas !== "") {
+      request.maxPriorityFeePerGas = BigInt(tx.maxPriorityFeePerGas);
+    }
+
+    if (request.gasLimit == null) {
+      request.gasLimit = await this.estimateRheaGasLimit(tx, request);
+    }
+
+    try {
+      const hash = await this.signer.sendUncheckedTransaction(request);
+      return hash;
+    } catch (error: any) {
+      csl("EVM sendRheaTx", "red-500", "Error sending Rhea tx: %o", error);
+      let finalErrorMessage = `Transaction failed: ${error.message}`;
+      if (error?.message?.includes("user rejected action")) {
+        finalErrorMessage = error.message;
+      }
+      throw new Error(finalErrorMessage);
+    }
+  }
+
+  /**
+   * Estimate on tx.chainId. The signer was built for the wallet's previous chain,
+   * and its eth_estimateGas path keeps that chain after a switch.
+   * A contract revert on the tx chain still blocks the send. A transport failure
+   * uses a fallback gas limit so the wallet can simulate on the switched chain.
+   */
+  private async estimateRheaGasLimit(tx: any, request: Record<string, any>): Promise<bigint> {
+    const chainId = Number(tx?.chainId);
+    const provider = Number.isFinite(chainId) ? getSignedProviderByChainId(chainId) : null;
+    if (!provider) {
+      csl("EVM sendRheaTx", "yellow-600", "no signed RPC for chain %s, using fallback gas", tx?.chainId);
+      return DEFAULT_GAS_LIMIT_FAILED;
+    }
+
+    try {
+      const gasLimit = await provider.estimateGas({
+        to: request.to,
+        data: request.data,
+        value: request.value,
+        from: tx.from || this.signer?.address,
+      });
+      return gasLimit * 120n / 100n;
+    } catch (error) {
+      if (isExecutionRevert(error)) {
+        csl("EVM sendRheaTx", "red-500", "estimateGas reverted on chain %s: %o", chainId, error);
+        throw new Error(rheaEstimateRevertMessage(error));
+      }
+      csl("EVM sendRheaTx", "yellow-600", "estimateGas transport failed on chain %s: %o", chainId, error);
+      return DEFAULT_GAS_LIMIT_FAILED;
+    }
+  }
+
+  /**
    * Unified send method that routes to specific send methods based on type
    * @param type Send type from SendType enum
    * @param params Parameters for the send transaction
@@ -913,8 +1013,6 @@ export default class RainbowWallet {
       refundTo,
       depositAddress,
       amountWei,
-      prices,
-      evmGasFees,
     } = params;
 
     const execTime = new ExecTime({ type: `OneClick EVM ${fromToken.chainName}`, logStyle: "stone-300" });
@@ -934,34 +1032,19 @@ export default class RainbowWallet {
     ];
 
     execTime.breakpoint();
-    const mergedCalls = [
-      this.allowance({
-        dry,
-        contractAddress: fromToken.contractAddress,
-        address: refundTo,
-        spender: proxyAddress,
-        amountWei: amountWei,
-        provider,
-      }),
-      this.estimateTransaction({
-        dry,
-        contract: proxyContract,
-        method: "proxyTransfer",
-        param: proxyParam,
-        fromToken,
-        prices,
-        evmGasFees,
-      })
-    ];
-    const [allowance, ett]: any = await Promise.all(mergedCalls);
+    const allowance = await this.allowance({
+      dry,
+      contractAddress: fromToken.contractAddress,
+      address: refundTo,
+      spender: proxyAddress,
+      amountWei: amountWei,
+      provider,
+    });
     result.needApprove = allowance.needApprove;
     result.approveSpender = proxyAddress;
-    result.fees.estimateGasUsd = ett.estimateSourceGasUsd;
-    result.estimateSourceGas = ett.estimateSourceGas;
-    result.totalEstimateSourceGas = ett.estimateSourceGas;
-    result.estimateSourceGasUsd = ett.estimateSourceGasUsd;
-    proxyParam.push({ gasLimit: ett.estimateSourceGasLimit });
-    execTime.log("allowance & estimateTransaction");
+    // Placeholder so the async gas estimate can overwrite gasLimit before send.
+    proxyParam.push({ gasLimit: DEFAULT_GAS_LIMIT_FAILED / 2n });
+    execTime.log("allowance");
 
     result.sendParam = {
       method: "proxyTransfer",

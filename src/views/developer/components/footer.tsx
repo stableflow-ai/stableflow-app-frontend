@@ -25,7 +25,7 @@ const Footer = () => {
         ))}
       </nav>
       <p className="text-xs text-[#9FA7BA] mt-6">
-        © {new Date().getFullYear()} Stableflow. All rights reserved.
+        © {new Date().getFullYear()} StableFlow. All rights reserved.
       </p>
     </footer>
   );

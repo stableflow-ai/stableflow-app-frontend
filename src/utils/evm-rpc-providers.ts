@@ -8,6 +8,48 @@ export interface SignedRpcProvider extends ethers.AbstractProvider {
 }
 
 const providerCache = new Map<number, SignedRpcProvider>();
+const JSON_RPC_EXECUTION_ERROR = 3;
+
+const hasRevertPayload = (data: unknown): boolean =>
+  typeof data === "string" && data.startsWith("0x") && data.length > 2;
+
+/**
+ * True when the node executed the call and the contract reverted.
+ * `missing revert data` with no payload is a node that did not return a
+ * contract answer, so callers should try the next RPC.
+ */
+export function isExecutionRevert(err: unknown): boolean {
+  if (!err || typeof err !== "object") return false;
+
+  const error = err as {
+    code?: unknown;
+    message?: unknown;
+    data?: unknown;
+    shortMessage?: unknown;
+    error?: { code?: unknown; data?: unknown; message?: unknown };
+    info?: { error?: { code?: unknown; data?: unknown; message?: unknown } };
+  };
+  const nested = error.error || error.info?.error;
+  const data = error.data ?? nested?.data;
+  const rawMessage =
+    (typeof error.shortMessage === "string" && error.shortMessage) ||
+    (typeof error.message === "string" && error.message) ||
+    (typeof nested?.message === "string" && nested.message) ||
+    "";
+  const message = rawMessage.toLowerCase();
+
+  if (message.includes("missing revert data") && !hasRevertPayload(data)) {
+    return false;
+  }
+  if (hasRevertPayload(data)) return true;
+  if (message.includes("execution reverted")) return true;
+
+  if (error.code === JSON_RPC_EXECUTION_ERROR || nested?.code === JSON_RPC_EXECUTION_ERROR) {
+    return hasRevertPayload(nested?.data) || hasRevertPayload(error.data);
+  }
+
+  return false;
+}
 
 class SequentialFallbackProvider extends ethers.AbstractProvider {
   private providers: ethers.JsonRpcProvider[];
@@ -27,7 +69,7 @@ class SequentialFallbackProvider extends ethers.AbstractProvider {
       try {
         return await provider._perform(req);
       } catch (err) {
-        if (ethers.isError(err, "CALL_EXCEPTION")) throw err;
+        if (isExecutionRevert(err)) throw err;
         lastError = err;
       }
     }
@@ -40,6 +82,7 @@ class SequentialFallbackProvider extends ethers.AbstractProvider {
       try {
         return await provider.send(method, params);
       } catch (err) {
+        if (isExecutionRevert(err)) throw err;
         lastError = err;
       }
     }
@@ -47,7 +90,7 @@ class SequentialFallbackProvider extends ethers.AbstractProvider {
   }
 }
 
-// RPC_CHAINS="tron,solana,aptos,aptos,sui,ethereum,arbitrum,bsc,avalanche,base,polygon,gnosis,optimism,berachain,xlayer,plasma,mantle,megaeth,ink,stable,celo,sei,fraxtal,katana,pharos,arc"
+// RPC_CHAINS="tron,solana,aptos,aptos,sui,ethereum,arbitrum,bsc,avalanche,base,polygon,gnosis,optimism,berachain,monad,xlayer,plasma,mantle,megaeth,ink,stable,celo,sei,fraxtal,katana,pharos,arc"
 const ChainNameMap: Record<string, string> = {
   "eth": "ethereum",
   "arb": "arbitrum",
@@ -58,6 +101,7 @@ const ChainNameMap: Record<string, string> = {
   "gnosis": "gnosis",
   "op": "optimism",
   "bera": "berachain",
+  "monad": "monad",
   "xlayer": "xlayer",
   "plasma": "plasma",
   "mantle": "mantle",

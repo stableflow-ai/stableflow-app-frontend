@@ -14,6 +14,10 @@ import { arbitrum } from "viem/chains";
 import Loading from "@/components/loading/icon";
 import { csl } from "@/utils/log";
 import { getStableflowIcon } from "@/utils/format/logo";
+import TokenIcon from "@/all-tokens/components/token-icon";
+import { getRouterLogo } from "@/all-tokens/constants";
+import { useIsAllTokens } from "@/all-tokens/route-mode";
+import { PendingSkeleton, PendingTitleSkeleton } from "./loading";
 
 export default function Pending(props: any) {
   const { className, isTitle = true, contentClassName, history } = props;
@@ -24,6 +28,7 @@ export default function Pending(props: any) {
   const { switchChain } = useSwitchChain();
 
   const pendingLength = history.page.total || history.list.length;
+  const showSkeleton = history.loading && !history.list.length;
 
   const [layerzeroDataMap, setLayerzeroDataMap] = useState<any>();
   const { run: getLayerzeroData, cancel: cancelGetLayerzeroData } = useDebounceFn(async () => {
@@ -74,25 +79,33 @@ export default function Pending(props: any) {
       {
         isTitle && (
           <div className="text-[16px] font-[500]">
-            {pendingLength} Pending transfers
+            {showSkeleton ? (
+              <PendingTitleSkeleton />
+            ) : (
+              <>{pendingLength} Pending transfers</>
+            )}
           </div>
         )
       }
       <div className={clsx("mt-[14px] grid grid-cols-1 md:grid-cols-2 gap-[18px]", contentClassName)}>
-        {history.list.map((item: any, index: number) => (
-          <PendingItem
-            key={index}
-            data={item}
-            layerzeroData={layerzeroDataMap?.[item.deposit_address]}
-            wallets={wallets}
-            toast={toast}
-            evmAccount={evmAccount}
-            switchChain={switchChain}
-            getList={history.getList}
-          />
-        ))}
+        {showSkeleton ? (
+          <PendingSkeleton />
+        ) : (
+          history.list.map((item: any, index: number) => (
+            <PendingItem
+              key={index}
+              data={item}
+              layerzeroData={layerzeroDataMap?.[item.deposit_address]}
+              wallets={wallets}
+              toast={toast}
+              evmAccount={evmAccount}
+              switchChain={switchChain}
+              getList={history.getList}
+            />
+          ))
+        )}
       </div>
-      {pendingLength === 0 && (
+      {!showSkeleton && pendingLength === 0 && (
         <div className="text-[14px] font-[300] opacity-50 text-center">
           No Data.
         </div>
@@ -102,7 +115,11 @@ export default function Pending(props: any) {
 }
 
 const PendingItem = ({ className, data, layerzeroData, wallets, toast, evmAccount, switchChain, getList }: any) => {
+  const allTokensEnabled = useIsAllTokens();
   const historyStore = useHistoryStore();
+  const routeLogo = allTokensEnabled
+    ? getRouterLogo(data.rhea_router)
+    : TradeProjectMap[data.project as TradeProject]?.logo;
 
   const wallet = wallets["evm"];
 
@@ -176,11 +193,15 @@ const PendingItem = ({ className, data, layerzeroData, wallets, toast, evmAccoun
     <div className={clsx("w-full md:w-[300px] bg-[#EDF0F7] rounded-[12px]", className)}>
       <div className="rounded-[12px] bg-white border border-[#EDF0F7] p-[12px] pt-[6px]">
         <div className="mb-2 flex justify-between items-center">
-          <img
-            src={TradeProjectMap[data.project as TradeProject]?.logo}
-            alt=""
-            className="w-[62px] h-[16px] object-center object-contain shrink-0"
-          />
+          {routeLogo ? (
+            <img
+              src={routeLogo}
+              alt=""
+              className="w-[62px] h-[16px] object-left object-contain shrink-0"
+            />
+          ) : (
+            <span className="w-[62px] h-[16px] shrink-0" />
+          )}
           {
             layerzeroData?.needRetry && (
               <button
@@ -202,11 +223,20 @@ const PendingItem = ({ className, data, layerzeroData, wallets, toast, evmAccoun
           }
         </div>
         <div className="flex items-center gap-[10px]">
-          <img
-            src={data.token_icon}
-            alt=""
-            className="w-[28px] h-[28px]"
-          />
+          {allTokensEnabled ? (
+            <TokenIcon
+              symbol={data.symbol}
+              blockchain={data.from_chain}
+              containerClassName="w-[28px] h-[28px] shrink-0"
+              className="object-center object-contain"
+            />
+          ) : (
+            <img
+              src={data.token_icon}
+              alt=""
+              className="w-[28px] h-[28px]"
+            />
+          )}
           <span>
             <span className="text-[16px] font-bold">
               {formatNumber(data.token_in_amount, 2, true)}
@@ -220,11 +250,20 @@ const PendingItem = ({ className, data, layerzeroData, wallets, toast, evmAccoun
             alt=""
             className="w-[5px] h-[8px] object-center object-contain shrink-0"
           />
-          <img
-            src={data.to_token_icon}
-            alt=""
-            className="w-[28px] h-[28px]"
-          />
+          {allTokensEnabled ? (
+            <TokenIcon
+              symbol={data.to_symbol}
+              blockchain={data.to_chain}
+              containerClassName="w-[28px] h-[28px] shrink-0"
+              className="object-center object-contain"
+            />
+          ) : (
+            <img
+              src={data.to_token_icon}
+              alt=""
+              className="w-[28px] h-[28px]"
+            />
+          )}
           <span>
             <span className="text-[16px] font-bold">
               {formatNumber(data.token_out_amount, 2, true)}

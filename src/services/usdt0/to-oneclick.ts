@@ -110,6 +110,7 @@ export class Usdt0OneClickService {
       outputAmount: oneClickResult.outputAmount,
       priceImpact: oneClickResult.priceImpact,
       exchangeRate: oneClickResult.exchangeRate,
+      quoteDeadline: oneClickResult.quoteDeadline,
       quoteParam: {
         ...usdt0Result.quoteParam,
         toToken: params.toToken,

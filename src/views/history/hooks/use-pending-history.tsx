@@ -1,6 +1,9 @@
 import { BASE_API_URL } from "@/config/api";
-import chains from "@/config/chains";
+import stableChains from "@/config/chains";
+import rheaChains from "@/all-tokens/chains";
 import { stablecoinLogoMap } from "@/config/tokens";
+import { useIsAllTokens } from "@/all-tokens/route-mode";
+import { ALL_TOKENS_TRADE_TYPE, STABLECOIN_TRADE_TYPE } from "@/all-tokens/config";
 import { TradeProject, TradeProjectMap } from "@/config/trade";
 import { Service } from "@/services/constants";
 import { getQuoteModes } from "@/services/utils";
@@ -13,6 +16,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 export function usePendingHistory(history?: any) {
   const wallets = useWalletsStore();
   const historyStore = useHistoryStore();
+  const allTokensEnabled = useIsAllTokens();
+  const pendingRefreshNonce = useHistoryStore((state) => state.pendingRefreshNonce);
+  const chains = allTokensEnabled ? rheaChains : stableChains;
+  const tradeType = allTokensEnabled ? ALL_TOKENS_TRADE_TYPE : STABLECOIN_TRADE_TYPE;
 
   const [list, setList] = useState<any>([]);
   const [page, setPage] = useState<any>({
@@ -28,12 +35,16 @@ export function usePendingHistory(history?: any) {
   }, [wallets]);
 
   const listPollingRef = useRef<any>(null);
+  const lastRefreshNonceRef = useRef(pendingRefreshNonce);
+  const requestSeqRef = useRef(0);
+  const [awaiting, setAwaiting] = useState(false);
   const { runAsync: getList, loading } = useRequest(async (params?: any) => {
+    const requestId = params?.requestId ?? requestSeqRef.current;
     try {
       const response = await axios({
         url: `${BASE_API_URL}/v1/trades`,
         params: {
-          type: 0,
+          type: tradeType,
           status: "pending",
           address: params?.address ?? accounts,
           page: params?.page ?? page.current,
@@ -45,6 +56,8 @@ export function usePendingHistory(history?: any) {
           "Content-Type": "application/json"
         },
       });
+
+      if (requestId !== requestSeqRef.current) return;
 
       if (response.status !== 200) {
         return;
@@ -59,8 +72,10 @@ export function usePendingHistory(history?: any) {
 
       const _list = response.data.data.data;
       _list.forEach((item: any) => {
-        item.token_icon = stablecoinLogoMap[item.symbol];
-        item.to_token_icon = stablecoinLogoMap[item.to_symbol];
+        if (!allTokensEnabled) {
+          item.token_icon = stablecoinLogoMap[item.symbol];
+          item.to_token_icon = stablecoinLogoMap[item.to_symbol];
+        }
 
         const currentFromChain = Object.values(chains).find((chain) => chain.blockchain === item.from_chain);
         const currentToChain = Object.values(chains).find((chain) => chain.blockchain === item.to_chain);
@@ -139,11 +154,15 @@ export function usePendingHistory(history?: any) {
 
       if (_list.length > 0) {
         listPollingRef.current = setTimeout(() => {
-          getList(params);
+          getList({ ...params, requestId });
         }, 10000);
       }
     } catch (error) {
       console.error("get pending history failed: %o", error);
+    } finally {
+      if (requestId === requestSeqRef.current) {
+        setAwaiting(false);
+      }
     }
   }, {
     manual: true,
@@ -154,7 +173,14 @@ export function usePendingHistory(history?: any) {
   });
 
   useEffect(() => {
+    cancelGetList();
+    if (listPollingRef.current) {
+      clearTimeout(listPollingRef.current);
+      listPollingRef.current = null;
+    }
+    const requestId = ++requestSeqRef.current;
     if (!accounts) {
+      setAwaiting(false);
       setList([]);
       historyStore.updatePendingNumber(0);
       historyStore.updateServicePendingNumber({ isClear: true });
@@ -170,21 +196,34 @@ export function usePendingHistory(history?: any) {
       return;
     }
 
-    // Initial request (debounced)
+    setList([]);
+    setAwaiting(true);
     debouncedGetList({
       address: accounts,
       page: 1,
+      requestId,
     });
 
     return () => {
       cancelGetList();
     };
-  }, [accounts]);
+  }, [accounts, allTokensEnabled]);
+
+  useEffect(() => {
+    if (!accounts) return;
+    if (lastRefreshNonceRef.current === pendingRefreshNonce) return;
+    lastRefreshNonceRef.current = pendingRefreshNonce;
+    if (pendingRefreshNonce <= 0) return;
+    getList({
+      address: accounts,
+      page: 1,
+    });
+  }, [pendingRefreshNonce, accounts]);
 
   return {
     list,
     page,
-    loading,
+    loading: loading || awaiting,
     getList,
     debouncedGetList,
   };

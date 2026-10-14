@@ -1,5 +1,5 @@
 import clsx from "clsx";
-import { chainTypes } from "@/config/chains";
+import { chainTypes as stableChainTypes } from "@/config/chains";
 import LazyImage from "@/components/lazy-image";
 
 export default function ChainIcon({
@@ -7,13 +7,16 @@ export default function ChainIcon({
   connected,
   className,
   style,
+  types,
 }: {
   chain: string;
   connected: boolean;
   className?: string;
   style?: React.CSSProperties;
+  types?: Record<string, { bgColor: string; icon: string; iconGray: string }>;
 }) {
-  const chainInfo = chainTypes[chain];
+  const chainInfo = (types ?? stableChainTypes)[chain];
+  if (!chainInfo) return null;
   return (
     <div
       className={clsx(

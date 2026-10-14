@@ -194,6 +194,7 @@ export class OneClick2FraxZeroService extends FraxZeroService {
 
       return {
         ...firstStepResult,
+        quoteDeadline: firstStepResult.quoteDeadline,
         routeDisabled: routeStatus.disabled,
         needPermit: true,
         permitSpender: FRAXZERO_REDEEM_AND_MINT_CONTRACT,

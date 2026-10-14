@@ -64,7 +64,7 @@ const Footer2 = () => {
           <div className="max-w-[320px]">
             <div className="flex justify-between items-center gap-1">
               <img
-                src={getStableflowLogo("logo-stableflow-full.svg")}
+                src={getStableflowLogo("logo-stableflow-full-2.svg")}
                 alt="StableFlow"
                 className="w-[170px] h-auto"
               />

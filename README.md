@@ -1,4 +1,4 @@
-# Stableflow — Frontend
+# StableFlow — Frontend
 
 A lightweight **cross-chain bridge UI** powered by [NEAR Intents](https://docs.near-intents.org/).  
 Users simply specify what they want to achieve — e.g., *bridge USDT from BSC to NEAR* — and solvers compete to execute the most efficient route.

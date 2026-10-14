@@ -22,10 +22,10 @@ const CostEfficientModal = ({ open, onClose }: CostEfficientModalProps) => {
 
         <div className="mx-auto max-w-[676px] text-center">
           <h2 className="text-[26px] font-light leading-[120%] text-black">
-            Why Stableflow can be more cost-efficient
+            Why StableFlow can be more cost-efficient
           </h2>
           <div className="mt-4 text-sm font-light leading-[150%] text-black">
-            <p>Stableflow uses a simpler routing cost structure.</p>
+            <p>StableFlow uses a simpler routing cost structure.</p>
             <p>There are no bridge fees, and no Legacy Mesh or messaging fees are added to the route.</p>
             <p>That means more of the user’s transfer amount can arrive on the destination chain.</p>
           </div>

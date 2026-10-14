@@ -6,20 +6,33 @@ import { SendType } from "../types";
 import { Service } from "@/services/constants";
 import { csl } from "@/utils/log";
 import { ExecTime } from "@/utils/exec-time";
-import { actionCreators } from "@near-wallet-selector/core";
+import type { NearConnector } from "@hot-labs/near-connect";
 
 const createFunctionCallAction = (
   methodName: string,
   args: Record<string, any>,
   gas: string,
   deposit: string
-) => actionCreators.functionCall(methodName, args, BigInt(gas), BigInt(deposit));
+) => ({
+  type: "FunctionCall" as const,
+  params: {
+    methodName,
+    args,
+    gas: String(gas),
+    deposit: String(deposit),
+  },
+});
+
+const transactionHash = (outcome: {
+  transaction?: { hash?: string };
+  transaction_outcome?: { id?: string };
+}) => outcome?.transaction?.hash || outcome?.transaction_outcome?.id || "";
 
 export default class NearWallet {
-  private selector: any;
+  private connector: NearConnector;
   private rpcUrl: string;
-  constructor(_selector: any) {
-    this.selector = _selector;
+  constructor(connector: NearConnector) {
+    this.connector = connector;
     // https://rpc.mainnet.near.org
     // https://nearinner.deltarpc.com
     this.rpcUrl = "https://nearinner.deltarpc.com";
@@ -56,7 +69,6 @@ export default class NearWallet {
     depositAddress: string;
     amount: string;
   }) {
-    const wallet = await this.selector.wallet();
     const checkStorage = await this.query(
       data.originAsset,
       "storage_balance_of",
@@ -97,16 +109,7 @@ export default class NearWallet {
       ]
     });
 
-    const result = await wallet.signAndSendTransactions({
-      transactions,
-      callbackUrl: "/"
-    });
-
-    if (result.slice(-1).length) {
-      return result.slice(-1)[0].transaction.hash;
-    }
-
-    return "";
+    return this.sendTransaction({ transactions });
   }
 
   async getBalance(token: any, _account: string, options?: { isCatchError?: boolean; }) {
@@ -299,7 +302,7 @@ export default class NearWallet {
   }
 
   async checkTransactionStatus(txHash: string) {
-    const wallet = await this.selector.wallet();
+    const wallet = await this.connector.wallet();
     const accounts = await wallet.getAccounts();
     const accountId = accounts[0]?.accountId;
 
@@ -330,13 +333,11 @@ export default class NearWallet {
 
   async quoteOneClickProxy(params: any) {
     const {
-      dry,
       proxyAddress,
       fromToken,
       refundTo,
       depositAddress,
       amountWei,
-      prices,
     } = params;
 
     const execTime = new ExecTime({ type: "OneClick NEAR", logStyle: "lime-200" });
@@ -344,7 +345,7 @@ export default class NearWallet {
     const result: any = { fees: {} };
 
     try {
-      const wallet = await this.selector.wallet();
+      const wallet = await this.connector.wallet();
       const accounts = await wallet.getAccounts();
       const userAccountId = refundTo || accounts[0]?.accountId;
 
@@ -436,21 +437,6 @@ export default class NearWallet {
         ]
       });
 
-      execTime.breakpoint();
-      const ett = await this.estimateTransaction({
-        dry,
-        transactions,
-        fromToken,
-        prices,
-      });
-      execTime.log("estimateTransaction");
-
-      result.fees.estimateGasUsd = ett.estimateSourceGasUsd;
-      result.estimateSourceGas = ett.estimateSourceGas;
-      result.totalEstimateSourceGas = ett.estimateSourceGas;
-      result.estimateSourceGasUsd = ett.estimateSourceGasUsd;
-
-      // Set sendParam for subsequent transaction sending
       result.sendParam = {
         transactions,
         callbackUrl: "/"
@@ -458,18 +444,6 @@ export default class NearWallet {
 
     } catch (error) {
       csl("Near quoteOneClickProxy", "red-500", "oneclick quote proxy failed: %o", error);
-      // Use default gas estimation
-      const ett = await this.estimateTransaction({
-        dry,
-        transactions: [null, null, null],
-        fromToken,
-        prices,
-      });
-
-      result.fees.estimateGasUsd = ett.estimateSourceGasUsd;
-      result.estimateSourceGas = ett.estimateSourceGas;
-      result.totalEstimateSourceGas = ett.estimateSourceGas;
-      result.estimateSourceGasUsd = ett.estimateSourceGasUsd;
     }
 
     execTime.logTotal("quoteOneClickProxy");
@@ -477,23 +451,22 @@ export default class NearWallet {
   }
 
   async sendTransaction(params: any) {
-    const { transactions, callbackUrl } = params;
+    const { transactions } = params;
 
     if (!transactions || !Array.isArray(transactions)) {
       throw new Error("Invalid sendParam: transactions array is required");
     }
 
-    const wallet = await this.selector.wallet();
-    const result = await wallet.signAndSendTransactions({
-      transactions,
-      callbackUrl: callbackUrl || "/"
-    });
-
-    if (result.slice(-1).length) {
-      return result.slice(-1)[0].transaction.hash;
+    const wallet = await this.connector.wallet();
+    let lastHash = "";
+    for (const tx of transactions) {
+      const outcome = await wallet.signAndSendTransaction({
+        receiverId: tx.receiverId,
+        actions: tx.actions,
+      });
+      lastHash = transactionHash(outcome) || lastHash;
     }
-
-    return "";
+    return lastHash;
   }
 
   /**
@@ -508,6 +481,60 @@ export default class NearWallet {
       default:
         throw new Error(`Unsupported quote type: ${type}`);
     }
+  }
+
+  /**
+   * Sign and send a Rhea Near tx payload ({ receiverId, actions } or transaction array).
+   */
+  async sendRheaTx(tx: any): Promise<string> {
+    const rawTransactions = Array.isArray(tx)
+      ? tx
+      : Array.isArray(tx?.transactions)
+        ? tx.transactions
+        : tx?.receiverId
+          ? [tx]
+          : null;
+
+    if (!rawTransactions?.length) {
+      throw new Error("Invalid Near Rhea tx: missing receiverId/actions or transactions");
+    }
+
+    const transactions = rawTransactions.map((item: any) => {
+      if (!item?.receiverId || !Array.isArray(item.actions)) {
+        throw new Error("Invalid Near Rhea tx entry: receiverId and actions are required");
+      }
+
+      const actions = item.actions.map((action: any) => {
+        const type = action?.type || action?.enum;
+        const params = action?.params || action;
+
+        if (type === "FunctionCall" || params?.methodName) {
+          let args = params.args ?? {};
+          if (typeof args === "string") {
+            try {
+              args = JSON.parse(args);
+            } catch {
+              // keep string args if not valid JSON
+            }
+          }
+          return createFunctionCallAction(
+            params.methodName,
+            args,
+            String(params.gas ?? "30000000000000"),
+            String(params.deposit ?? "0")
+          );
+        }
+
+        return action;
+      });
+
+      return {
+        receiverId: item.receiverId,
+        actions,
+      };
+    });
+
+    return this.sendTransaction({ transactions });
   }
 
   /**

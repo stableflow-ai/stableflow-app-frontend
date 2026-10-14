@@ -1,4 +1,7 @@
 import useWalletStore from "@/stores/use-wallet";
+import useWalletsStore, { type WalletType } from "@/stores/use-wallets";
+import FieldAlert from "@/components/field-alert";
+import { isTemporarySwapLimitError } from "@/utils/quote-error";
 import { useSwitchChain } from "wagmi";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import Loading from "@/components/loading/icon";
@@ -23,8 +26,8 @@ import { Autoplay } from "swiper/modules";
 import CostEfficientModal from "../cost-efficient-modal";
 import { isInTrustWallet } from "@/libs/wallets/utils/device";
 import { useInjectedTron } from "@/libs/wallets/tron/use-injected-tron";
+import BridgeToolbar from "@/all-tokens/components/bridge-toolbar";
 
-const Setting = lazy(() => import("@/sections/setting"));
 const Result = lazy(() => import("../result"));
 const QuoteRoutes = lazy(() => import("../routes"));
 
@@ -32,10 +35,12 @@ type NetworksProps = {
   addressValidation?: {
     isValid?: boolean;
   } | null;
+  onRefreshQuote?: () => void;
 };
 
-export default function Networks({ addressValidation }: NetworksProps) {
+export default function Networks({ addressValidation, onRefreshQuote }: NetworksProps) {
   const walletStore = useWalletStore();
+  const wallets = useWalletsStore();
   const bridgeStore = useBridgeStore();
   const { switchChainAsync } = useSwitchChain();
   const { prices } = usePricesStore();
@@ -96,6 +101,7 @@ export default function Networks({ addressValidation }: NetworksProps) {
   const hybridPath = routeHybridPath(quoteData, bridgeStore.quoteDataService);
   const isFromTron = quoteData?.quoteParam?.fromToken?.chainType === "tron";
   const isQuoting = bridgeStore.getQuoting(bridgeStore.quoteDataService);
+  const isRefreshing = bridgeStore.getQuoting();
   const isFromDisabled = !walletStore.fromToken || balanceLoading;
   const isToDisabled = isQuoting || !quoteData;
 
@@ -107,6 +113,15 @@ export default function Networks({ addressValidation }: NetworksProps) {
     const _balance = balancesStore[key]?.[walletStore.fromToken.chainId || walletStore.fromToken.blockchain]?.[walletStore.fromToken.contractAddress];
     return _balance ? _balance : "0.00";
   }, [walletStore.fromToken, balancesStore]);
+
+  const fromWallet = walletStore.fromToken ? wallets[walletStore.fromToken.chainType as WalletType] : undefined;
+  const errorConnect = !!fromWallet && !fromWallet.account;
+  const errorConnectEvm = (
+    [Service.OneClickUsdt0, Service.OneClickCCTP, Service.CCTPOneClick, Service.FraxZeroOneClick, Service.OneClickFraxZero] as Service[]
+  ).includes(bridgeStore.quoteDataService) && !wallets.evm?.account;
+  const showsFieldError = !errorConnect && !errorConnectEvm;
+  const swapLimitAlert = showsFieldError && isTemporarySwapLimitError(bridgeStore.errorTips);
+  const balanceAlert = showsFieldError && bridgeStore.errorTips === "Insufficient balance";
 
   useEffect(() => {
     return () => {
@@ -121,9 +136,9 @@ export default function Networks({ addressValidation }: NetworksProps) {
       <div className="w-full flex justify-between items-center">
         <div className="text-[#444C59] text-sm md:text-base w-full flex items-center gap-1">
           <div className="select-none">
-            Best price compared with
+            <span className="hidden md:inline">Best price</span> <span>compared</span> <span className="hidden md:inline">with</span>
           </div>
-          <div className="w-17.5 h-5 overflow-hidden">
+          <div className="w-17.5 h-5 overflow-hidden shrink-0">
             <Swiper
               className="w-full h-full"
               slidesPerView={1}
@@ -162,7 +177,7 @@ export default function Networks({ addressValidation }: NetworksProps) {
             />
           </button>
         </div>
-        <Setting />
+        <BridgeToolbar isQuoting={isRefreshing} onRefreshQuote={onRefreshQuote} />
       </div>
       <CostEfficientModal
         open={isCostModalOpen}
@@ -182,22 +197,25 @@ export default function Networks({ addressValidation }: NetworksProps) {
           token={walletStore.fromToken}
           prices={prices}
           disabled={!walletStore.fromToken}
+          valueAlert={swapLimitAlert}
           rightContent={(
             <div className="flex items-center justify-end gap-3.5">
               {
                 !!walletStore.fromToken && (
-                  <div className="flex items-center gap-1 text-xs text-[#9FA7BA] leading-[100%] font-['SpaceGrotesk] font-normal">
-                    <div className="">
-                      Balance:
+                  <FieldAlert active={balanceAlert} iconPosition="start">
+                    <div className="flex items-center gap-1 text-xs text-[#9FA7BA] leading-[100%] font-['SpaceGrotesk] font-normal">
+                      <div className="">
+                        Balance:
+                      </div>
+                      <div className="text-[#0E3616]">
+                        {
+                          balanceLoading ? (
+                            <Loading size={12} className="text-[#B3BBCE]" />
+                          ) : formatNumber(balance, 2, true, { round: Big.roundDown })
+                        }
+                      </div>
                     </div>
-                    <div className="text-[#0E3616]">
-                      {
-                        balanceLoading ? (
-                          <Loading size={12} className="text-[#B3BBCE]" />
-                        ) : formatNumber(balance, 2, true, { round: Big.roundDown })
-                      }
-                    </div>
-                  </div>
+                  </FieldAlert>
                 )
               }
               <div className="flex items-center gap-1.5">

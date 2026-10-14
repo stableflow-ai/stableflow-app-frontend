@@ -66,7 +66,7 @@ const DocOverview = () => {
   return (
     <section className="pt-16 md:pt-20">
       <h2 className="text-2xl font-semibold text-[#000] leading-[100%]">
-        Explore the Stableflow documentation
+        Explore the StableFlow documentation
       </h2>
 
       <div className="grid md:grid-cols-3 gap-2.5 mt-8">

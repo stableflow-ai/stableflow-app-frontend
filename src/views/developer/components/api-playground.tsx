@@ -472,7 +472,7 @@ const ApiPlayground = () => {
     <section className="pt-16 md:pt-20">
       <div className="">
         <h2 className="text-2xl font-semibold text-black leading-[100%]">
-          Try the Stableflow API
+          Try the StableFlow API
         </h2>
         <p className="text-[#9FA7BA] text-md font-normal mt-4.5">
           Explore real API calls and inspect the response structure.

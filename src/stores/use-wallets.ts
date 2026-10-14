@@ -1,6 +1,6 @@
 import { create } from "zustand/index";
 
-export type WalletType = "near" | "sol" | "evm" | "tron" | "aptos" | "ton" | "sui";
+export type WalletType = "near" | "sol" | "evm" | "tron" | "aptos" | "ton" | "sui" | "btc" | "zcash";
 
 interface WalletsState {
   near: {
@@ -53,6 +53,22 @@ interface WalletsState {
     walletName: string | null;
   };
   sui: {
+    account: string | null;
+    wallet: any;
+    connect: () => void;
+    disconnect: () => void;
+    walletIcon: string | null;
+    walletName: string | null;
+  };
+  btc: {
+    account: string | null;
+    wallet: any;
+    connect: () => void;
+    disconnect: () => void;
+    walletIcon: string | null;
+    walletName: string | null;
+  };
+  zcash: {
     account: string | null;
     wallet: any;
     connect: () => void;
@@ -122,6 +138,22 @@ const useWalletsStore = create<WalletsState>((set) => ({
     disconnect: () => { },
     walletIcon: null,
     walletName: null
+  },
+  btc: {
+    account: null,
+    wallet: null,
+    connect: () => { },
+    disconnect: () => { },
+    walletIcon: null,
+    walletName: null,
+  },
+  zcash: {
+    account: null,
+    wallet: null,
+    connect: () => { },
+    disconnect: () => { },
+    walletIcon: null,
+    walletName: null,
   },
   set: (params) => set(() => ({ ...params }))
 }));

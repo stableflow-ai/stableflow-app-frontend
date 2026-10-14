@@ -1,6 +1,9 @@
 import type { TokenChain } from "@/config/chains";
 import { Service } from "@/services/constants";
 import { QuoteErrorLevel } from "@/services/quote-error";
+import { getQuoteModes } from "@/services/utils";
+import type { BridgeState } from "@/stores/use-bridge";
+import type { BalancesState } from "@/stores/use-balances";
 import type { WalletType } from "@/stores/use-wallets";
 import { evmRpcFallbackProvider } from "@/utils/evm-rpc-providers";
 import { csl } from "@/utils/log";
@@ -160,12 +163,67 @@ export const formatBridgeRpcErrorMessage = (errorMessage: string) => {
   return errorMessage;
 };
 
-export const sortQuoteData = (quoteDataMap: Map<string, any>) => {
+export type QuoteSortBalance = {
+  /** Source wallet is connected and this token's balance field has been written, including "0". */
+  balanceRead: boolean;
+  balance?: string | number;
+};
+
+export const readSourceTokenBalance = (params: {
+  balances: Partial<BalancesState> | Record<string, any>;
+  fromToken?: { chainType?: string; chainId?: string | number; blockchain?: string; contractAddress?: string; };
+  walletConnected: boolean;
+}): QuoteSortBalance => {
+  if (!params.walletConnected || !params.fromToken?.chainType || !params.fromToken.contractAddress) {
+    return { balanceRead: false };
+  }
+
+  const chainKey = params.fromToken.chainId || params.fromToken.blockchain;
+  const balances = params.balances as Record<string, any>;
+  const chainBalances = balances?.[`${params.fromToken.chainType}Balances`]?.[chainKey as string];
+  if (!chainBalances) {
+    return { balanceRead: false };
+  }
+
+  const raw = chainBalances[params.fromToken.contractAddress];
+  if (raw === undefined || raw === null || raw === "") {
+    return { balanceRead: false };
+  }
+
+  return { balanceRead: true, balance: raw };
+};
+
+export const isUnaffordableExactOutput = (service: string, data: any, sourceBalance?: QuoteSortBalance) => {
+  if (!sourceBalance?.balanceRead) return false;
+
+  const { isExactOutput } = getQuoteModes({
+    quoteData: data,
+    bridgeStore: { quoteDataService: service } as BridgeState,
+  });
+  if (!isExactOutput) return false;
+
+  const amountIn = data?.quote?.amountInFormatted;
+  if (amountIn == null || amountIn === "") return false;
+
+  try {
+    return Big(amountIn).gt(sourceBalance.balance ?? 0);
+  } catch {
+    return false;
+  }
+};
+
+export const sortQuoteData = (quoteDataMap: Map<string, any>, sourceBalance?: QuoteSortBalance) => {
   const validQuoteList = Array.from(quoteDataMap.entries()).filter(([_, data]) => !data.errMsg);
 
   const sortedQuoteData = validQuoteList.sort((a: any, b: any) => {
     const [_serviceA, dataA] = a;
     const [_serviceB, dataB] = b;
+
+    const unaffordableA = isUnaffordableExactOutput(_serviceA, dataA, sourceBalance);
+    const unaffordableB = isUnaffordableExactOutput(_serviceB, dataB, sourceBalance);
+    if (unaffordableA !== unaffordableB) {
+      return unaffordableA ? 1 : -1;
+    }
 
     const disabledA = !!dataA.routeDisabled;
     const disabledB = !!dataB.routeDisabled;

@@ -7,6 +7,8 @@ import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { useLayoutContext } from "./context";
 import useIsMobile from "@/hooks/use-is-mobile";
 import { stablecoinWithChains } from "@/config/tokens";
+import { isBridgePath, isHistoryPath, MODE_ROUTES, useIsAllTokens, useRouteMode } from "@/all-tokens/route-mode";
+import { chainTypes as rheaChainTypes, RHEA_WALLET_TYPES } from "@/all-tokens/chains";
 import clsx from "clsx";
 import { menuItems } from "@/components/navigation-menu/menu-items";
 import { useTrack } from "@/hooks/use-track";
@@ -40,9 +42,8 @@ export default function UserActions() {
     return () => el.removeEventListener("scroll", onScroll);
   }, [containerRef]);
 
-  const isHomePage = useMemo(() => pathname === "/", [pathname]);
   const isAppBar = useMemo(() => {
-    return isMobile && ["/", "/history"].includes(pathname);
+    return isMobile && (isBridgePath(pathname) || isHistoryPath(pathname));
   }, [pathname, isMobile]);
 
   const hideActions = useMemo(() => {
@@ -178,38 +179,14 @@ const ChainsButton = ({
   onClick,
 }: any) => {
   const walletsStore = useWalletsStore();
+  const allTokensEnabled = useIsAllTokens();
 
-  const isMobile = useIsMobile();
-
-  // Get the list of chains to display
   const chainsToDisplay = useMemo(() => {
-    const allChains = Object.entries(stablecoinWithChains);
-
-    return allChains;
-
-    // if (!isMobile) {
-    //   // Desktop: show all chains
-    //   return allChains;
-    // }
-
-    // // Mobile: prioritize EVM, if EVM is not connected, show other connected wallet
-    // if (walletsStore.evm?.account) {
-    //   // EVM is connected, show EVM
-    //   return allChains.filter(([chain]) => chain === 'evm');
-    // }
-
-    // // EVM is not connected, find other connected wallet
-    // const connectedChain = allChains.find(([chain]) =>
-    //   walletsStore?.[chain as WalletType]?.account
-    // );
-
-    // if (connectedChain) {
-    //   return [connectedChain];
-    // }
-
-    // // None connected, default to first one (EVM)
-    // return allChains.slice(0, 1);
-  }, [isMobile, walletsStore.evm?.account, walletsStore.sol?.account, walletsStore.near?.account, walletsStore.tron?.account]);
+    if (allTokensEnabled) {
+      return RHEA_WALLET_TYPES.filter((type) => !!rheaChainTypes[type]);
+    }
+    return Object.keys(stablecoinWithChains);
+  }, [allTokensEnabled]);
 
   return (
     <button
@@ -217,11 +194,12 @@ const ChainsButton = ({
       className="p-[6px] flex justify-center items-center button rounded-[18px] bg-white shadow-[0_0_6px_0_rgba(0,0,0,0.10)]"
     >
       {
-        chainsToDisplay.map(([chain, _tokens], index) => {
+        chainsToDisplay.map((chain, index) => {
           return (
             <ChainIcon
-              key={index}
+              key={chain}
               chain={chain}
+              types={allTokensEnabled ? rheaChainTypes : undefined}
               connected={!!walletsStore?.[chain as WalletType]?.account}
               className={clsx("relative", index > 0 && "ml-[-8px]")}
               style={{
@@ -286,6 +264,8 @@ const MobileMenuButton = ({ isOpen, onClick, isSimple = false }: { isOpen: boole
 
 const MobileMenuDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) => {
   const location = useLocation();
+  const mode = useRouteMode();
+  const transferPath = MODE_ROUTES[mode].bridge;
 
   return (
     <>
@@ -369,7 +349,7 @@ const MobileMenuDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: () =>
               }
 
               const isActive = item.path === "/"
-                ? location.pathname === "/"
+                ? isBridgePath(location.pathname)
                 : location.pathname.startsWith(item.path);
 
               if (item.isExternal) {
@@ -393,7 +373,7 @@ const MobileMenuDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: () =>
               return (
                 <Link
                   key={index}
-                  to={item.path}
+                  to={item.path === "/" ? transferPath : item.path}
                   onClick={onClose}
                   className={clsx(
                     "w-full h-[60px] px-4 rounded-lg text-lg text-black text-center font-['SpaceGrotesk'] font-normal hover:bg-[#F5F7FD] transition-colors duration-150 relative flex justify-center items-center",
@@ -431,9 +411,10 @@ const AccountButton = () => {
   const historyStore = useHistoryStore();
   const isMobile = useIsMobile();
   const { pathname } = useLocation();
+  const mode = useRouteMode();
 
   const isHistory = useMemo(() => {
-    return pathname === "/history";
+    return isHistoryPath(pathname);
   }, [pathname]);
 
   const isConnected = useMemo(() => {
@@ -447,7 +428,7 @@ const AccountButton = () => {
         onClick={() => {
           walletStore.set({ showWallet: true });
         }}
-        className="button px-3.5 md:px-5 py-1.5 md:py-2 bg-[#6284F5] rounded-4.5 text-base text-white"
+        className="button h-9 px-[15px] bg-[#6284F5] rounded-[18px] shadow-[0_2px_6px_0_rgba(0,0,0,0.10)] text-[16px] font-medium leading-none text-white [font-feature-settings:'liga'_off,'clig'_off]"
       >
         Connect
       </button>
@@ -461,7 +442,7 @@ const AccountButton = () => {
                 historyStore.setOpenDrawer(!historyStore.openDrawer);
                 return;
               }
-              navigate("/history");
+              navigate(MODE_ROUTES[mode].history);
             }}
           />
         )}

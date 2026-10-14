@@ -97,6 +97,7 @@ export class OneClickCCTPService {
 
     return {
       ...oneClickResult,
+      quoteDeadline: oneClickResult.quoteDeadline,
       needPermit: true,
       permitSpender: CCTP_PROXY_RELAY_CONTRACT,
       permitToken: MIDDLE_TOKEN_CHAIN,

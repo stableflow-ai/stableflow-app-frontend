@@ -1,13 +1,19 @@
 import { BASE_API_URL } from "@/config/api";
-import chains from "@/config/chains";
+import stableChains from "@/config/chains";
+import rheaChains from "@/all-tokens/chains";
 import { stablecoinLogoMap } from "@/config/tokens";
+import { useIsAllTokens } from "@/all-tokens/route-mode";
+import { ALL_TOKENS_TRADE_TYPE, STABLECOIN_TRADE_TYPE } from "@/all-tokens/config";
 import useWalletsStore from "@/stores/use-wallets";
 import { useDebounceFn, useRequest } from "ahooks";
 import axios from "axios";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 export function useHistory() {
   const wallets = useWalletsStore();
+  const allTokensEnabled = useIsAllTokens();
+  const chains = allTokensEnabled ? rheaChains : stableChains;
+  const tradeType = allTokensEnabled ? ALL_TOKENS_TRADE_TYPE : STABLECOIN_TRADE_TYPE;
 
   const [list, setList] = useState<any>([]);
   const [page, setPage] = useState<any>({
@@ -22,12 +28,16 @@ export function useHistory() {
     return _accounts.join(",");
   }, [wallets]);
 
+  const requestSeqRef = useRef(0);
+  const [awaiting, setAwaiting] = useState(false);
+
   const { runAsync: getList, loading } = useRequest(async (params?: any) => {
+    const requestId = params?.requestId ?? requestSeqRef.current;
     try {
       const response = await axios({
         url: `${BASE_API_URL}/v1/trades`,
         params: {
-          type: 0,
+          type: tradeType,
           status: "success,failed,continue",
           address: params?.address ?? accounts,
           page: params?.page ?? page.current,
@@ -40,6 +50,8 @@ export function useHistory() {
         },
       });
 
+      if (requestId !== requestSeqRef.current) return;
+
       if (response.status !== 200) {
         return;
       }
@@ -50,8 +62,10 @@ export function useHistory() {
 
       const _list = response.data.data.data;
       _list.forEach((item: any) => {
-        item.token_icon = stablecoinLogoMap[item.symbol];
-        item.to_token_icon = stablecoinLogoMap[item.to_symbol];
+        if (!allTokensEnabled) {
+          item.token_icon = stablecoinLogoMap[item.symbol];
+          item.to_token_icon = stablecoinLogoMap[item.to_symbol];
+        }
 
         const currentFromChain = Object.values(chains).find((chain) => chain.blockchain === item.from_chain);
         const currentToChain = Object.values(chains).find((chain) => chain.blockchain === item.to_chain);
@@ -80,6 +94,10 @@ export function useHistory() {
       });
     } catch (error) {
       console.error("get history failed: %o", error);
+    } finally {
+      if (requestId === requestSeqRef.current) {
+        setAwaiting(false);
+      }
     }
   }, {
     manual: true,
@@ -91,7 +109,9 @@ export function useHistory() {
 
   useEffect(() => {
     cancelGetList();
+    const requestId = ++requestSeqRef.current;
     if (!accounts) {
+      setAwaiting(false);
       setList([]);
       setPage(() => {
         return {
@@ -103,11 +123,14 @@ export function useHistory() {
       });
       return;
     }
+    setList([]);
+    setAwaiting(true);
     debouncedGetList({
       address: accounts,
       page: 1,
+      requestId,
     });
-  }, [accounts]);
+  }, [accounts, allTokensEnabled]);
 
   const handleChangePage = (page: number) => {
     if (loading) return;
@@ -120,7 +143,7 @@ export function useHistory() {
   return {
     list,
     page,
-    loading,
+    loading: loading || awaiting,
     handleChangePage,
     getList,
   };

@@ -2,6 +2,8 @@ import { Outlet, useLocation } from "react-router-dom";
 import { lazy, Suspense, useRef } from "react";
 import UserActions from "./user-actions";
 import LayoutContext from "./context";
+import useWalletBalances from "@/all-tokens/hooks/use-wallet-balances";
+import { isBridgePath, isHistoryPath, useIsAllTokens } from "@/all-tokens/route-mode";
 
 // import useUpdateTxns from "@/hooks/use-update-txns";
 // import SupportButton from "@/components/support-button";
@@ -10,16 +12,23 @@ import LayoutContext from "./context";
 const Footer = lazy(() => import("./footer"));
 const Footer2 = lazy(() => import("./footer2"));
 const Wallet = lazy(() => import("@/sections/wallet"));
+const AllTokensWallet = lazy(() => import("@/all-tokens/wallet"));
 const PixelBlast = lazy(() => import("@/components/pixel-blast"));
 
 const LoadingSpinner = () => null;
+
+function AllTokensBalanceFetcher() {
+  useWalletBalances();
+  return null;
+}
 
 export default function Layout() {
   const containerRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
 
-  const isHomePage = location.pathname === "/";
-  const ishistoryPage = location.pathname === "/history";
+  const allTokensEnabled = useIsAllTokens();
+  const isHomePage = isBridgePath(location.pathname);
+  const ishistoryPage = isHistoryPath(location.pathname);
   const isFooter2 = !isHomePage && !ishistoryPage;
 
   // useUpdateTxns();
@@ -52,8 +61,9 @@ export default function Layout() {
             <UserActions />
           </Suspense>
           <Outlet />
+          {allTokensEnabled ? <AllTokensBalanceFetcher /> : null}
           <Suspense fallback={<LoadingSpinner />}>
-            <Wallet />
+            {allTokensEnabled ? <AllTokensWallet /> : <Wallet />}
           </Suspense>
 
           {

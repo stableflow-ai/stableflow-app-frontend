@@ -14,6 +14,7 @@ import { chainTypes } from "@/config/chains";
 import clsx from "clsx";
 import { isInTrustWallet } from "@/libs/wallets/utils/device";
 import { useInjectedTron } from "@/libs/wallets/tron/use-injected-tron";
+import useIsMobile from "@/hooks/use-is-mobile";
 
 const Assets = lazy(() => import("@/views/bridge/components/assets"));
 const Total = lazy(() => import("./total"));
@@ -23,6 +24,7 @@ export default function Wallet() {
   const walletsStore = useWalletsStore();
   const balancesStore = useBalancesStore();
   const { hasInjected } = useInjectedTron();
+  const isMobile = useIsMobile();
   useEvmBalances(walletStore.showWallet);
 
   const walletConnected = useMemo(() => {
@@ -36,6 +38,10 @@ export default function Wallet() {
       onClose={() => {
         walletStore.set({ showWallet: false });
       }}
+      showMask={isMobile}
+      maskClosable={isMobile}
+      lockScroll={isMobile}
+      showCollapse={!isMobile}
     >
       <Suspense fallback={null}>
         <Assets />

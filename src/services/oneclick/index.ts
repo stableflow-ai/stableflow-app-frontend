@@ -10,6 +10,7 @@ import { getRouteStatus, OneClickSwapType, Service } from "@/services/constants"
 import { csl } from "@/utils/log";
 import { ExecTime } from "@/utils/exec-time";
 import { BASE_API_URL } from "@/config/api";
+import { NEAR_INTENTS_QUOTE_DEADLINE_MS } from "./config";
 
 export const BridgeFee = [
   {
@@ -48,7 +49,7 @@ export const excludeFees: string[] = ["estimateGasUsd"];
 export class OneClickService {
   private api: AxiosInstance;
   private quoteApi: AxiosInstance;
-  private offsetTime = 1000 * 60 * 60;
+  private offsetTime = NEAR_INTENTS_QUOTE_DEADLINE_MS;
   constructor() {
     this.api = axios.create({
       baseURL: "https://1click.chaindefuser.com/v0",
@@ -294,6 +295,7 @@ export class OneClickService {
     const routeStatus = getRouteStatus(Service.OneClick);
     result.routeDisabled = routeStatus.disabled;
     result.sourceQuoteParams = params;
+    result.quoteDeadline = quoteParams.deadline;
 
     return result;
   }

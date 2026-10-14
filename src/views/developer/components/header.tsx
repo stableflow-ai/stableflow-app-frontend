@@ -5,7 +5,7 @@ export function Header() {
     <header className="py-6 flex items-center justify-between">
       <div className="flex items-center gap-8">
         <a href="/" className="font-semibold text-lg text-[#2B3337]">
-          Stableflow
+          StableFlow
         </a>
         <nav className="hidden md:flex items-center gap-6">
           <a
