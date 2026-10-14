@@ -6,6 +6,7 @@ import { useAllTokensStore } from "@/all-tokens/store";
 import { useIsAllTokens } from "@/all-tokens/route-mode";
 import AllTokensBridge from "@/all-tokens/bridge";
 import AllTokensGuide from "@/all-tokens/components/all-tokens-guide";
+import PrivatePayBanner from "./components/private-pay-banner";
 import clsx from "clsx";
 
 // Dynamic import components
@@ -71,6 +72,7 @@ export default function Bridge() {
           ) : (
             <StablecoinBridge />
           )}
+          <PrivatePayBanner />
         </div>
       </div>
       <Suspense fallback={null}>
