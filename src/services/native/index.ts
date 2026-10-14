@@ -4,6 +4,7 @@ import axios from "axios";
 import Big from "big.js";
 import { NativeChains, NativeV4Routes } from "./contract";
 import { getRouteStatus, Service } from "../constants";
+import { DEFAULT_QUOTE_ERROR_MESSAGE, QuoteError, QuoteErrorLevel } from "../quote-error";
 import { ExecTime } from "@/utils/exec-time";
 import { csl } from "@/utils/log";
 
@@ -73,7 +74,10 @@ class NativeService {
     execTime.log("Native API");
 
     if (res.status !== 200 || !res.data?.success) {
-      let errorMessage = res.data?.message || "Native quote failed";
+      if (!res.data?.message) {
+        throw new QuoteError(DEFAULT_QUOTE_ERROR_MESSAGE, QuoteErrorLevel.Fallback);
+      }
+      let errorMessage: string = res.data.message;
       // requested amount smaller than token in minimum wei [18446744073709551615]
       if (errorMessage.includes("requested amount smaller than token in minimum wei")) {
         const match = errorMessage.match(/\[(\d+)\]/);
@@ -91,7 +95,7 @@ class NativeService {
           errorMessage = `Amount is too low. A minimum of ${formatNumber(minAmount, toToken.decimals, true)} ${toToken.symbol} must be output.`;
         }
       }
-      throw new Error(errorMessage);
+      throw new QuoteError(errorMessage, QuoteErrorLevel.Backend);
     }
 
     execTime.breakpoint();

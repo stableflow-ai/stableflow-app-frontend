@@ -1,5 +1,6 @@
 import type { TokenChain } from "@/config/chains";
 import { Service } from "@/services/constants";
+import { QuoteErrorLevel } from "@/services/quote-error";
 import { getQuoteModes } from "@/services/utils";
 import type { BridgeState } from "@/stores/use-bridge";
 import type { BalancesState } from "@/stores/use-balances";
@@ -261,6 +262,14 @@ export const sortQuoteData = (quoteDataMap: Map<string, any>, sourceBalance?: Qu
   });
 
   return sortedQuoteData;
+};
+
+// Array.prototype.sort is stable, so routes in the same level keep return order (first returned wins)
+export const pickQuoteErrorService = (quoteDataMap: Map<string, any>): string | undefined => {
+  const failedQuoteList = Array.from(quoteDataMap.entries()).filter(([_, data]) => !!data?.errMsg);
+  const getLevel = (data: any): QuoteErrorLevel => data?.errLevel ?? QuoteErrorLevel.Business;
+  failedQuoteList.sort(([, dataA], [, dataB]) => getLevel(dataA) - getLevel(dataB));
+  return failedQuoteList[0]?.[0];
 };
 
 export const routeHybridPath = (quoteData: any, service: Service) => {

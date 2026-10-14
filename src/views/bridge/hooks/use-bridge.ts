@@ -17,6 +17,7 @@ import useBalancesStore, { type BalancesState } from "@/stores/use-balances";
 import { BridgeDefaultWallets, PRICE_IMPACT_THRESHOLD } from "@/config";
 import { formatNumber } from "@/utils/format/number";
 import { getRouteStatus, Service, ServiceBackend } from "@/services/constants";
+import { DEFAULT_QUOTE_ERROR_MESSAGE, QuoteError, QuoteErrorLevel } from "@/services/quote-error";
 import usePricesStore from "@/stores/use-prices";
 import { v4 as uuidV4 } from "uuid";
 import { BridgeFees, TronTransferStepStatus } from "@/config/tron";
@@ -28,7 +29,7 @@ import { useAccount, useSwitchChain } from "wagmi";
 import { usePendingHistory } from "@/views/history/hooks/use-pending-history";
 import { csl } from "@/utils/log";
 import { addTradeReport } from "@/stores/use-trade-report";
-import { createEvmAllowanceProvider, formatBridgeRpcErrorMessage, isUnaffordableExactOutput, readSourceTokenBalance, sortQuoteData, verifyPostApproveAllowance } from "../utils";
+import { createEvmAllowanceProvider, formatBridgeRpcErrorMessage, isUnaffordableExactOutput, readSourceTokenBalance, pickQuoteErrorService, sortQuoteData, verifyPostApproveAllowance } from "../utils";
 import { getQuoteModes } from "@/services/utils";
 import useEvmGasFeesStore from "@/stores/use-evm-gas-fees";
 import { ExecTime } from "@/utils/exec-time";
@@ -222,11 +223,15 @@ export default function useBridge(props?: any) {
         throw new Error("Request cancelled: outdated request");
       }
 
-      const defaultErrorMessage = "Failed to get quote, please try again later";
+      const defaultErrorMessage = DEFAULT_QUOTE_ERROR_MESSAGE;
       const oneClickErrorResponse = error?.response?.data?.message;
       let _finalErrorMessage = oneClickErrorResponse || error?.message || defaultErrorMessage;
       let _finalReportErrorMessage = oneClickErrorResponse || error?.message || (error ? error + "" : defaultErrorMessage);
+      let _errLevel: QuoteErrorLevel = oneClickErrorResponse ? QuoteErrorLevel.Backend : QuoteErrorLevel.Fallback;
       if (([Service.OneClick, Service.OneClickUsdt0, Service.Usdt0OneClick, Service.CCTPOneClick, Service.OneClickCCTP, Service.FraxZeroOneClick, Service.OneClickFraxZero] as Service[]).includes(service)) {
+        _errLevel = oneClickErrorResponse && oneClickErrorResponse !== "Internal server error"
+          ? QuoteErrorLevel.Backend
+          : QuoteErrorLevel.Fallback;
         const getQuoteErrorMessage = (): { message: string; sourceMessage: string; } => {
           const _messageResult = {
             message: oneClickErrorResponse || defaultErrorMessage,
@@ -263,6 +268,12 @@ export default function useBridge(props?: any) {
         _finalReportErrorMessage = _errorMessage.sourceMessage;
       }
 
+      if (error instanceof QuoteError) {
+        _finalErrorMessage = error.message;
+        _finalReportErrorMessage = error.message;
+        _errLevel = error.level;
+      }
+
       _finalErrorMessage = formatTemporarySwapLimitMessage(_finalErrorMessage);
 
       const _quoteData = {
@@ -271,6 +282,7 @@ export default function useBridge(props?: any) {
         quoteParam: quoteParams,
         correlationId: error?.response?.data?.correlationId,
         errMsg: _finalErrorMessage,
+        errLevel: _errLevel,
       };
       bridgeStore.setQuoteData(service, _quoteData);
 
@@ -1325,8 +1337,9 @@ export default function useBridge(props?: any) {
     }
 
     if (!validQuoteList.length) {
-      if (allQuoteList?.[0]?.[0]) {
-        bridgeStore.set({ quoteDataService: allQuoteList[0][0], showFee: false });
+      const errorService = pickQuoteErrorService(bridgeStore.quoteDataMap) ?? allQuoteList?.[0]?.[0];
+      if (errorService) {
+        bridgeStore.set({ quoteDataService: errorService, showFee: false });
       }
       setAutoSelect(false);
       return;

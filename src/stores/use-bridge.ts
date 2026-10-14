@@ -1,6 +1,7 @@
 import { create } from "zustand/index";
 import { Service } from "@/services/constants";
 import { TronTransferStepStatus } from "@/config/tron";
+import type { QuoteErrorLevel } from "@/services/quote-error";
 
 export interface BridgeState {
   amount: string;
@@ -147,5 +148,6 @@ export default useBridgeStore;
 export interface QuoteData {
   type: Service;
   errMsg?: string;
+  errLevel?: QuoteErrorLevel;
   data?: any;
 }

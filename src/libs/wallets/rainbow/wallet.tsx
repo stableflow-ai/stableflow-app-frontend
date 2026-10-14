@@ -8,6 +8,7 @@ import { LZ_RECEIVE_VALUE, USDT0_CONFIG, USDT0_LEGACY_MESH_TRANSFTER_FEE } from 
 import { quoteSignature } from "../utils/cctp";
 import { SendType } from "../types";
 import { Service } from "@/services/constants";
+import { QuoteError, QuoteErrorLevel } from "@/services/quote-error";
 import { getHopMsgFee } from "@/services/usdt0/hop-composer";
 import { getDestinationAssociatedTokenAddress } from "../utils/solana";
 import { allUsdtChains } from "@/config/tokens";
@@ -453,6 +454,7 @@ export default class RainbowWallet {
 
     if (BigInt(amountLdClean) === 0n) {
       result.errMsg = "Amount below minimum cross-chain unit";
+      result.errLevel = QuoteErrorLevel.Business;
       return result;
     }
 
@@ -565,6 +567,7 @@ export default class RainbowWallet {
     csl("EVMWallet quoteOFT", "red-600", "Minimum received amount: %o", Big(amountLdClean).div(10 ** fromToken.decimals).times(Big(1).minus(Big(slippageTolerance || 0).div(100))).toFixed(6, 0));
     if (Big(result.outputAmount).lt(Big(amountLdClean).div(10 ** fromToken.decimals).times(Big(1).minus(Big(slippageTolerance || 0).div(100))))) {
       result.errMsg = "Slippage limit exceeded";
+      result.errLevel = QuoteErrorLevel.Business;
       return result;
     }
 
@@ -938,6 +941,7 @@ export default class RainbowWallet {
     csl("EVMWallet quoteCCTP", "red-600", "cctpFeeRate: %o, slippageLimit: %o", cctpFeeRate.toFixed(6), slippageLimit.toFixed(6));
     if (max_fee && amountWei && cctpFeeRate.gt(slippageLimit)) {
       result.errMsg = "Slippage limit exceeded";
+      result.errLevel = QuoteErrorLevel.Business;
       return result;
     }
 
@@ -1215,6 +1219,7 @@ export default class RainbowWallet {
 
     if (BigInt(amountLdClean) === 0n) {
       result.errMsg = "Amount below minimum cross-chain unit";
+      result.errLevel = QuoteErrorLevel.Business;
       return result;
     }
 
@@ -1530,7 +1535,7 @@ export default class RainbowWallet {
     execTime.log("preivewRedeemFrxUSD");
 
     if (isInsufficientLiquidity) {
-      throw new Error("Insufficient liquidity");
+      throw new QuoteError("Insufficient liquidity", QuoteErrorLevel.Business);
     }
 
     // outputAmount = USDC amount (6 decimals), human-readable

@@ -1,5 +1,6 @@
 import { getChainRpcUrl } from '@/config/chains';
 import { Service } from '@/services/constants';
+import { QuoteErrorLevel } from '@/services/quote-error';
 import { Address, beginCell, Cell, internal, toNano, TonClient } from '@ton/ton';
 import type { TupleItem } from '@ton/ton';
 import { TonConnectUI } from '@tonconnect/ui-react';
@@ -686,6 +687,7 @@ export default class TonWallet {
     csl("TonWallet quoteOFT", "red-600", "Minimum received amount: %o", Big(amountWei).div(10 ** fromToken.decimals).times(Big(1).minus(Big(slippageTolerance || 0).div(100))).toFixed(6, 0));
     if (Big(result.outputAmount).lt(Big(amountWei).div(10 ** fromToken.decimals).times(Big(1).minus(Big(slippageTolerance || 0).div(100))))) {
       result.errMsg = "Slippage limit exceeded";
+      result.errLevel = QuoteErrorLevel.Business;
       return result;
     }
 
@@ -780,7 +782,7 @@ export default class TonWallet {
     //   composeMessage,
     // });
 
-    return { errMsg: "Not supported yet" };
+    return { errMsg: "Not supported yet", errLevel: QuoteErrorLevel.Business };
   }
 
   async quoteOneClickProxy(params: any) {
