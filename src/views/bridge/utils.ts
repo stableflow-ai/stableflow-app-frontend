@@ -179,7 +179,8 @@ export const readSourceTokenBalance = (params: {
   }
 
   const chainKey = params.fromToken.chainId || params.fromToken.blockchain;
-  const chainBalances = params.balances?.[`${params.fromToken.chainType}Balances`]?.[chainKey as string];
+  const balances = params.balances as Record<string, any>;
+  const chainBalances = balances?.[`${params.fromToken.chainType}Balances`]?.[chainKey as string];
   if (!chainBalances) {
     return { balanceRead: false };
   }
