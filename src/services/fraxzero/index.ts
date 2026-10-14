@@ -1,4 +1,5 @@
 import { getRouteStatus, Service } from "@/services/constants";
+import { QuoteError, QuoteErrorLevel } from "@/services/quote-error";
 import { FRAXZERO_CONFIG, FRAXZERO_REQUIRED_DVN_COUNT } from "./config";
 import { FRAXZERO_ABI } from "./contract";
 import { calculateEstimateTime } from "../utils";
@@ -40,7 +41,7 @@ export class FraxZeroService extends Usdt0Service {
     if (isFromSolana) {
       // only support Ethereum and Fraxtal
       if (![1, 252].includes(toToken.chainId)) {
-        throw new Error("Invalid destination chain");
+        throw new QuoteError("Invalid destination chain", QuoteErrorLevel.Business);
       }
     }
 

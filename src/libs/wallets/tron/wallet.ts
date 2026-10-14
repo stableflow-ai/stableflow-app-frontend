@@ -6,6 +6,7 @@ import Big from "big.js";
 import { BridgeDefaultWallets } from "@/config";
 import { SendType } from "../types";
 import { Service } from "@/services/constants";
+import { QuoteErrorLevel } from "@/services/quote-error";
 import { DATA_HEX_PROTOBUF_EXTRA, LZ_RECEIVE_VALUE, SIGNATURE_SIZE, USDT0_LEGACY_MESH_TRANSFTER_FEE } from "@/services/usdt0/config";
 import { getHopMsgFee } from "@/services/usdt0/hop-composer";
 import { getDestinationAssociatedTokenAddress } from "../utils/solana";
@@ -679,6 +680,7 @@ export default class TronWallet {
     csl("TronWallet quoteOFT", "red-600", "Minimum received amount: %o", Big(amountWei).div(10 ** fromToken.decimals).times(Big(1).minus(Big(slippageTolerance || 0).div(100))).toFixed(6, 0));
     if (Big(result.outputAmount).lt(Big(amountWei).div(10 ** fromToken.decimals).times(Big(1).minus(Big(slippageTolerance || 0).div(100))))) {
       result.errMsg = "Slippage limit exceeded";
+      result.errLevel = QuoteErrorLevel.Business;
       return result;
     }
 

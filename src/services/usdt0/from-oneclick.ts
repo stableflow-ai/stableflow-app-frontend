@@ -9,6 +9,7 @@ import RainbowWallet from "@/libs/wallets/rainbow/wallet";
 import { getPrice } from "@/utils/format/price";
 import { ExecTime } from "@/utils/exec-time";
 import { getRouteStatus, OneClickSwapType, Service } from "../constants";
+import { QuoteErrorLevel } from "../quote-error";
 import { evmRpcFallbackProvider } from "@/utils/evm-rpc-providers";
 import { isStableToken } from "@/config/tokens";
 
@@ -83,7 +84,7 @@ export class OneClickUsdt0Service {
       .toFixed(0, Big.roundUp);
 
     if (Big(oneClickFeeRatio).gt(10000)) {
-      return { errMsg: `Amount is too low, at least ${usdt0MessageFeeAmountInFromToken}` };
+      return { errMsg: `Amount is too low, at least ${usdt0MessageFeeAmountInFromToken}`, errLevel: QuoteErrorLevel.Business };
     }
 
     // Call oneclick quote method again
