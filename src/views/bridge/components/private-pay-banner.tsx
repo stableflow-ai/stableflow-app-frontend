@@ -194,7 +194,7 @@ export default function PrivatePayBanner() {
       />
       <div className="hidden h-[84px] w-full items-center gap-3 overflow-hidden rounded-[16px] border border-[#ebebeb] bg-gradient-to-r from-black to-[#666] pl-5 md:flex">
         <div className="flex shrink-0 flex-col justify-center gap-3">
-          <p className="bg-gradient-to-r from-white to-[#999] bg-clip-text text-[16px] font-medium leading-none whitespace-nowrap text-transparent">
+          <p className="bg-gradient-to-r from-white to-[#999] bg-clip-text text-[16px] font-medium leading-[110%] whitespace-nowrap text-transparent">
             Move big. Stay invisible. Stay secure.
           </p>
           <PrivatePayButton reduceMotion={reduceMotion} />
