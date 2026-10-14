@@ -428,7 +428,7 @@ const AccountButton = () => {
         onClick={() => {
           walletStore.set({ showWallet: true });
         }}
-        className="button px-3.5 md:px-5 py-1.5 md:py-2 bg-[#6284F5] rounded-4.5 text-base text-white"
+        className="button h-9 px-[15px] bg-[#6284F5] rounded-[18px] shadow-[0_2px_6px_0_rgba(0,0,0,0.10)] text-[16px] font-medium leading-none text-white [font-feature-settings:'liga'_off,'clig'_off]"
       >
         Connect
       </button>

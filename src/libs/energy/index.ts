@@ -1,10 +1,30 @@
 import { BASE_API_URL, TRON_ENERGY_API_URL } from "@/config/api";
 import axios, { type AxiosInstance, type AxiosResponse } from "axios";
 
-const ENERGY_RENT_MAX_ATTEMPTS = 5;
-const ENERGY_RENT_BASE_DELAY_MS = 3000;
+export const ENERGY_RENT_FIRST_DELAY_MS = 15000;
+export const ENERGY_RENT_POLL_INTERVAL_MS = 15000;
+export const ENERGY_RENT_TIMEOUT_MS = 15 * 60 * 1000;
+export const ENERGY_RENT_STOP_CODE = 10009;
 
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+export class EnergyRentError extends Error {
+  code?: number;
+
+  constructor(message: string, code?: number) {
+    super(message);
+    this.name = "EnergyRentError";
+    this.code = code;
+  }
+}
+
+const toEnergyRentError = (error: any): EnergyRentError => {
+  if (error instanceof EnergyRentError) {
+    return error;
+  }
+
+  const code = error?.response?.data?.code;
+  const message = error?.response?.data?.message || error?.message || "Energy rent request failed";
+  return new EnergyRentError(message, typeof code === "number" ? code : undefined);
+};
 
 export type EnergyPeriod = "1H" | "1D" | "3D" | "30D";
 export type EnergyAmount = 65000n | 131000n;
@@ -41,41 +61,34 @@ class EnergyService {
     return await this.api.get("/api/price", { params });
   }
 
-  private async requestEnergyRent(params: {
-    receiveAddress: string;
-    txHash: string;
-  }) {
-    const response = await axios.post<EnergyRentParams, AxiosResponse<StableflowApiResponse<EnergyRentResponse>>>(`${BASE_API_URL}/v1/tron/energy/rent`, {
-      address: params.receiveAddress,
-      tx_hash: params.txHash,
-    });
-
-    if (response.status !== 200 || response.data.code !== 200) {
-      throw new Error(response.data.message || response.statusText);
-    }
-
-    return response.data.data;
-  }
-
   public async getEnergy(params: {
     receiveAddress: string;
     txHash: string;
   }) {
-    let lastError: Error | undefined;
+    try {
+      const response = await axios.post<EnergyRentParams, AxiosResponse<StableflowApiResponse<EnergyRentResponse>>>(`${BASE_API_URL}/v1/tron/energy/rent`, {
+        address: params.receiveAddress,
+        tx_hash: params.txHash,
+      });
 
-    for (let attempt = 1; attempt <= ENERGY_RENT_MAX_ATTEMPTS; attempt++) {
-      try {
-        return await this.requestEnergyRent(params);
-      } catch (error: any) {
-        lastError = new Error(error.response?.data?.message || error.message);
-        if (attempt === ENERGY_RENT_MAX_ATTEMPTS) {
-          throw lastError;
-        }
-        await sleep(ENERGY_RENT_BASE_DELAY_MS * attempt);
+      const payload = response.data;
+      const code = payload?.code;
+
+      if (code === ENERGY_RENT_STOP_CODE) {
+        throw new EnergyRentError(payload?.message || "Energy rent failed", code);
       }
-    }
 
-    throw lastError ?? new Error("Energy rent request failed");
+      if (code === 200 && payload?.data?.order_serial) {
+        return payload.data;
+      }
+
+      throw new EnergyRentError(
+        payload?.message || (code === 200 ? "Missing order_serial" : response.statusText),
+        code,
+      );
+    } catch (error: any) {
+      throw toEnergyRentError(error);
+    }
   }
 
   public async getEnergyStatus(params: {
