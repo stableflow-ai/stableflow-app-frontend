@@ -1,8 +1,10 @@
 import QuoteRoute from "./route";
 import useBridgeStore from "@/stores/use-bridge";
 import { useMemo } from "react";
-import { sortQuoteData } from "../../utils";
+import { readSourceTokenBalance, sortQuoteData } from "../../utils";
 import useWalletStore from "@/stores/use-wallet";
+import useWalletsStore, { type WalletType } from "@/stores/use-wallets";
+import useBalancesStore from "@/stores/use-balances";
 import Big from "big.js";
 
 const QuoteRoutes = (props: any) => {
@@ -21,13 +23,24 @@ const QuoteRoutes = (props: any) => {
     fromToken,
     toToken,
   } = useWalletStore();
+  const wallets = useWalletsStore();
+  const balancesStore = useBalancesStore();
+  const sourceWalletConnected = !!wallets[fromToken?.chainType as WalletType]?.account;
+  const sourceBalance = useMemo(
+    () => readSourceTokenBalance({
+      balances: balancesStore,
+      fromToken,
+      walletConnected: sourceWalletConnected,
+    }),
+    [balancesStore, fromToken, sourceWalletConnected],
+  );
 
   const isQuoting = useMemo(() => {
     return getQuoting();
   }, [quotingMap]);
 
   const quoteDataList = useMemo(() => {
-    const sortedQuoteData = sortQuoteData(quoteDataMap);
+    const sortedQuoteData = sortQuoteData(quoteDataMap, sourceBalance);
     const list = sortedQuoteData.map(([service, data]) => ({
       service,
       ...data,
@@ -41,7 +54,7 @@ const QuoteRoutes = (props: any) => {
     //   return 0;
     // });
     return list;
-  }, [quoteDataMap, quoteDataService]);
+  }, [quoteDataMap, sourceBalance]);
 
   const displayedList = showRoutes ? quoteDataList : quoteDataList.slice(0, 1);
 

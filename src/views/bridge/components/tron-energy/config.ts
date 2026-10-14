@@ -15,7 +15,7 @@ export const TronTransferSteps: TronTransferStep[] = [
   {
     id: TronTransferStepStatus.EnergyPaying,
     title: "Waiting for Payment Confirmation",
-    description: "Estimated 3–30 seconds",
+    description: "Estimated 30–60 seconds",
   },
   {
     id: TronTransferStepStatus.EnergyRequest,

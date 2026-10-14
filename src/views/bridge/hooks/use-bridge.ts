@@ -28,7 +28,7 @@ import { useAccount, useSwitchChain } from "wagmi";
 import { usePendingHistory } from "@/views/history/hooks/use-pending-history";
 import { csl } from "@/utils/log";
 import { addTradeReport } from "@/stores/use-trade-report";
-import { createEvmAllowanceProvider, formatBridgeRpcErrorMessage, sortQuoteData, verifyPostApproveAllowance } from "../utils";
+import { createEvmAllowanceProvider, formatBridgeRpcErrorMessage, isUnaffordableExactOutput, readSourceTokenBalance, sortQuoteData, verifyPostApproveAllowance } from "../utils";
 import { getQuoteModes } from "@/services/utils";
 import useEvmGasFeesStore from "@/stores/use-evm-gas-fees";
 import { ExecTime } from "@/utils/exec-time";
@@ -287,6 +287,7 @@ export default function useBridge(props?: any) {
   };
 
   const [isAutoSelect, setAutoSelect] = useState(false);
+  const unaffordableCorrectedRef = useRef(false);
   // Request ID counter to ensure only the latest request results are processed
   const requestIdRef = useRef(0);
   const gasEstimateRef = useRef<Map<Service, { quoteId: number; promise: Promise<unknown>; }>>(new Map());
@@ -1279,12 +1280,47 @@ export default function useBridge(props?: any) {
     historyStore.servicePendingNumberWithPermit
   ]);
 
+  const fromChainType = walletStore.fromToken?.chainType as WalletType | undefined;
+  const sourceWalletConnected = !!fromChainType && !!wallets[fromChainType]?.account;
+  const sourceBalance = useMemo(
+    () => readSourceTokenBalance({
+      balances: balancesStore,
+      fromToken: walletStore.fromToken,
+      walletConnected: sourceWalletConnected,
+    }),
+    [balancesStore, walletStore.fromToken, sourceWalletConnected],
+  );
+
   useEffect(() => {
     const allQuoteList = Array.from(bridgeStore.quoteDataMap.entries());
     const validQuoteList = Array.from(bridgeStore.quoteDataMap.entries()).filter(([_, data]) => !data.errMsg);
     const isQuoting = bridgeStore.getQuoting();
 
-    if (bridgeStore.transferring || isQuoting || !isAutoSelect) {
+    if (bridgeStore.transferring || isQuoting) {
+      return;
+    }
+
+    if (!sourceBalance.balanceRead) {
+      unaffordableCorrectedRef.current = false;
+    }
+
+    const sortedQuoteData = sortQuoteData(bridgeStore.quoteDataMap, sourceBalance);
+
+    if (!isAutoSelect) {
+      const currentService = bridgeStore.quoteDataService;
+      const currentData = bridgeStore.quoteDataMap.get(currentService);
+      const bestService = sortedQuoteData[0]?.[0];
+      if (sourceBalance.balanceRead && !unaffordableCorrectedRef.current) {
+        unaffordableCorrectedRef.current = true;
+        if (
+          currentData
+          && bestService
+          && bestService !== currentService
+          && isUnaffordableExactOutput(currentService, currentData, sourceBalance)
+        ) {
+          bridgeStore.set({ quoteDataService: bestService, showFee: true });
+        }
+      }
       return;
     }
 
@@ -1301,19 +1337,25 @@ export default function useBridge(props?: any) {
     if (validQuoteList.length === 1) {
       bridgeStore.set({ quoteDataService: validQuoteList[0][0], showFee: true });
       csl("QuoteRoutes", "pink-950", "Quote Sorted Result: %o", validQuoteList);
+      if (sourceBalance.balanceRead) {
+        unaffordableCorrectedRef.current = true;
+      }
       setAutoSelect(false);
       return;
     }
     // sort and select the best one
-    const sortedQuoteData = sortQuoteData(bridgeStore.quoteDataMap);
     csl("QuoteRoutes", "pink-950", "Quote Sorted Result: %o", sortedQuoteData);
     bridgeStore.set({ quoteDataService: sortedQuoteData[0][0], showFee: true });
+    if (sourceBalance.balanceRead) {
+      unaffordableCorrectedRef.current = true;
+    }
     setAutoSelect(false);
   }, [
     bridgeStore.transferring,
     bridgeStore.quoteDataMap,
     bridgeStore.quotingMap,
     isAutoSelect,
+    sourceBalance,
   ]);
 
   // Auto requote for CCTP from Solana USDC to any chain USDC
