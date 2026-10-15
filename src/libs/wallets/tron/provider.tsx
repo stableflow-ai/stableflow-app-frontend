@@ -1,7 +1,7 @@
 import useWalletsStore from "@/stores/use-wallets";
 import { useEffect, useMemo, useRef, useState } from "react";
 import TronWallet from "./wallet";
-import WalletSelector from "../components/wallet-selector";
+import WalletSelector, { type WalletSelectorItem } from "../components/wallet-selector";
 import { useConfigStore } from "@/stores/use-config";
 import useBalancesStore from "@/stores/use-balances";
 import { OKXTronProvider } from "@okxconnect/universal-provider";
@@ -153,11 +153,25 @@ const Content = ({
   const walletRef = useRef<TronWallet | null>(null);
   const autoConnectedRef = useRef(false);
 
+  const walletByKey = useMemo(() => {
+    return new Map<string, (typeof wallets)[number]>(wallets.map((wallet) => [wallet.name, wallet]));
+  }, []);
+
   const selectorWallets = useMemo(() => {
-    if (supportsNativeTrustTron()) {
-      return wallets;
-    }
-    return wallets.filter((wallet) => wallet.name !== "Trust");
+    const list = supportsNativeTrustTron()
+      ? wallets
+      : wallets.filter((wallet) => wallet.name !== "Trust");
+    return list.map((wallet): WalletSelectorItem => {
+      const display = resolveWalletDisplay(wallet);
+      const detected = (wallet as unknown as { _readyState?: string })._readyState === "Found";
+      return {
+        key: wallet.name,
+        name: display.name,
+        icon: display.icon,
+        url: typeof wallet.url === "string" ? wallet.url : undefined,
+        detected,
+      };
+    });
   }, [injectedName]);
 
   // Wallet selector
@@ -168,8 +182,10 @@ const Content = ({
     onConnect,
     isConnecting,
   } = useWalletSelector({
-    connect: async (wallet: any) => {
-      await wallet.connect(wallet);
+    connect: async (key: string) => {
+      const wallet = walletByKey.get(key);
+      if (!wallet) return;
+      await (wallet as any).connect(wallet);
       setAdapter(wallet);
     },
   });
@@ -330,8 +346,6 @@ const Content = ({
       onConnect={onConnect}
       isConnecting={isConnecting}
       wallets={selectorWallets}
-      resolveDisplay={resolveWalletDisplay}
-      readyState={{ key: "_readyState", value: "Found" }}
       title="Select Tron Wallet"
     />
   );
@@ -344,13 +358,17 @@ const MobileWallet = () => {
   const tronLinkAdapter = wallets.find((wallet) => wallet.name === "TronLink");
   const tokenPocketAdapter = wallets.find((wallet) => wallet.name === "TokenPocket");
 
-  const mobileWalletOptions = useMemo(() => {
+  const mobileWalletOptions = useMemo((): WalletSelectorItem[] => {
     return [
       { key: "okx", name: "OKX Wallet", icon: OKX_ICON },
-      { key: "tokenpocket", name: "TokenPocket", icon: tokenPocketAdapter?.icon },
-      { key: "tronlink", name: "TronLink", icon: tronLinkAdapter?.icon },
+      { key: "tokenpocket", name: "TokenPocket", icon: typeof tokenPocketAdapter?.icon === "string" ? tokenPocketAdapter.icon : undefined },
+      { key: "tronlink", name: "TronLink", icon: typeof tronLinkAdapter?.icon === "string" ? tronLinkAdapter.icon : undefined },
     ];
-  }, []);
+  }, [tokenPocketAdapter, tronLinkAdapter]);
+
+  const mobileWalletByKey = useMemo(() => {
+    return new Map(mobileWalletOptions.map((wallet) => [wallet.key, wallet]));
+  }, [mobileWalletOptions]);
 
   const {
     open,
@@ -359,7 +377,10 @@ const MobileWallet = () => {
     onConnect,
     isConnecting,
   } = useWalletSelector({
-    connect: async (wallet: any) => {
+    connect: async (key: string) => {
+      const wallet = mobileWalletByKey.get(key);
+      if (!wallet) return;
+
       if (wallet.key === "okx") {
         await okxConnectRef.current?.connect();
         return;
@@ -411,7 +432,6 @@ const MobileWallet = () => {
       onConnect={onConnect}
       isConnecting={isConnecting}
       wallets={mobileWalletOptions}
-      isCheckReadyState={false}
       title="Select Tron Wallet"
     />
   );

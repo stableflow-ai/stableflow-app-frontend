@@ -18,6 +18,7 @@ import {
   getAccount,
   createAssociatedTokenAccountInstruction,
   getAssociatedTokenAddressSync,
+  TokenAccountNotFoundError,
 } from "@solana/spl-token";
 import { getChainRpcUrl } from "@/config/chains";
 import { AnchorProvider, BN, Program } from "@coral-xyz/anchor";
@@ -323,6 +324,9 @@ export default class SolanaWallet {
 
       return accountInfo.amount;
     } catch (error: any) {
+      if (error instanceof TokenAccountNotFoundError || error?.name === "TokenAccountNotFoundError") {
+        return "0";
+      }
       if (error.message.includes("could not find account")) {
         return "0";
       }

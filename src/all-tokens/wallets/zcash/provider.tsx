@@ -4,7 +4,7 @@ import useWalletsStore from "@/stores/use-wallets";
 import useBalancesStore from "@/stores/use-balances";
 import useIsMobile from "@/hooks/use-is-mobile";
 import { useWalletSelector } from "@/libs/wallets/hooks/use-wallet-selector";
-import WalletSelector from "@/libs/wallets/components/wallet-selector";
+import WalletSelector, { type WalletSelectorItem } from "@/libs/wallets/components/wallet-selector";
 import ZcashWallet, {
   ZCASH_MANUAL_WALLET_NAME,
   type ZcashWalletMode,
@@ -51,17 +51,19 @@ const Content = () => {
 
   const installed = mounted && !isMobile ? isNoirWalletInstalled() : false;
 
-  const wallets = useMemo(
-    () => [
-      {
-        name: "Noir Wallet",
-        icon: NOIR_ICON,
-        url: NOIR_DOWNLOAD_URL,
-        readyState: installed ? "Installed" : "NotDetected",
-      },
-    ],
-    [installed]
-  );
+  const selectorWallets = useMemo((): WalletSelectorItem[] => [
+    {
+      key: "Noir Wallet",
+      name: "Noir Wallet",
+      icon: NOIR_ICON,
+      url: NOIR_DOWNLOAD_URL,
+      detected: installed,
+    },
+  ], [installed]);
+
+  const walletByKey = useMemo(() => {
+    return new Map(selectorWallets.map((wallet) => [wallet.key, wallet]));
+  }, [selectorWallets]);
 
   const clearManualStorage = () => {
     try {
@@ -103,7 +105,9 @@ const Content = () => {
     onConnect,
     isConnecting,
   } = useWalletSelector({
-    connect: async () => {
+    connect: async (key: string) => {
+      const wallet = walletByKey.get(key);
+      if (!wallet) return;
       if (!isNoirWalletInstalled()) {
         window.open(NOIR_DOWNLOAD_URL, "_blank");
         return;
@@ -231,8 +235,7 @@ const Content = () => {
         onClose={onClose}
         onConnect={onConnect}
         isConnecting={isConnecting}
-        wallets={wallets}
-        readyState={{ key: "readyState", value: "Installed" }}
+        wallets={selectorWallets}
         title="Select Zcash Wallet"
       />
       <PasteAddressModal

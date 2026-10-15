@@ -10,7 +10,7 @@ import { useWallet } from "@aptos-labs/wallet-adapter-react";
 import { OKX_ICON, useWatchOKXConnect } from "../okxconnect";
 import { OKXAptosProvider } from "@okxconnect/aptos-provider";
 import { useWalletSelector } from "../hooks/use-wallet-selector";
-import WalletSelector from "../components/wallet-selector";
+import WalletSelector, { type WalletSelectorItem } from "../components/wallet-selector";
 import { csl } from "@/utils/log";
 
 export default function AptosProvider({
@@ -75,8 +75,29 @@ const Content = () => {
   } = useWallet();
 
   const setBalancesStore = useBalancesStore((state) => state.set);
+  const connectedNameRef = useRef<string | null>(null);
+  connectedNameRef.current = account && wallet?.name ? wallet.name : null;
 
-  // Wallet selector
+  const { selectorWallets, walletByKey } = useMemo(() => {
+    const list = [...wallets, ...notDetectedWallets];
+    const nextWallets: WalletSelectorItem[] = [];
+    const nextByKey = new Map<string, (typeof list)[number]>();
+    for (const wallet of list) {
+      const key = wallet.name;
+      if (!key || nextByKey.has(key)) continue;
+      nextByKey.set(key, wallet);
+      const detected = wallet.readyState === "Installed";
+      nextWallets.push({
+        key,
+        name: wallet.name,
+        icon: wallet.icon,
+        url: typeof wallet.url === "string" ? wallet.url : undefined,
+        detected,
+      });
+    }
+    return { selectorWallets: nextWallets, walletByKey: nextByKey };
+  }, [wallets, notDetectedWallets]);
+
   const {
     open,
     onClose,
@@ -84,8 +105,11 @@ const Content = () => {
     onConnect,
     isConnecting,
   } = useWalletSelector({
-    connect: async (wallet: any) => {
-      await connect(wallet.name);
+    connect: async (key: string) => {
+      const selected = walletByKey.get(key);
+      const name = selected?.name ?? key;
+      if (connectedNameRef.current === name) return;
+      await connect(name);
     },
   });
 
@@ -151,8 +175,7 @@ const Content = () => {
       onClose={onClose}
       onConnect={onConnect}
       isConnecting={isConnecting}
-      wallets={[...wallets, ...notDetectedWallets]}
-      readyState={{ key: "readyState", value: "Installed" }}
+      wallets={selectorWallets}
       title="Select Aptos Wallet"
     />
   );
@@ -173,8 +196,8 @@ const MobileContent = () => {
     onConnect,
     isConnecting,
   } = useWalletSelector({
-    connect: async (wallet: any) => {
-      if (wallet.key === "okx") {
+    connect: async (key: string) => {
+      if (key === "okx") {
         await okxConnectRef.current?.connect();
       }
     },
@@ -219,7 +242,6 @@ const MobileContent = () => {
       onConnect={onConnect}
       isConnecting={isConnecting}
       wallets={mobileWalletOptions}
-      isCheckReadyState={false}
       title="Select Aptos Wallet"
     />
   );
