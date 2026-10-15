@@ -13,6 +13,7 @@ import {
   useConnectModal,
   useConnector,
 } from "btc-wallet";
+import { WalletSelectDialog } from "@stableflow/pay-widgets/wallet-select";
 import { useDebounceFn } from "ahooks";
 import useWalletsStore from "@/stores/use-wallets";
 import useBalancesStore from "@/stores/use-balances";
@@ -64,8 +65,10 @@ const Content = () => {
 
   const { accounts } = useAccounts();
   const { sendBitcoin, signMessage, connector } = useBTCProvider();
-  const { openConnectModal, disconnect } = useConnectModal();
-  const { connectors } = useConnector();
+  const { disconnect } = useConnectModal();
+  const { connectors, connect: connectConnector } = useConnector();
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [connectingId, setConnectingId] = useState<string | null>(null);
 
   const account = accounts?.[0] || null;
 
@@ -80,7 +83,7 @@ const Content = () => {
       });
 
       const connect = () => {
-        openConnectModal();
+        setPickerOpen(true);
       };
 
       setWallets({
@@ -118,5 +121,34 @@ const Content = () => {
     setMounted(true);
   }, []);
 
-  return null;
+  return (
+    <WalletSelectDialog
+      open={pickerOpen}
+      onClose={() => setPickerOpen(false)}
+      title="Select Bitcoin Wallet"
+      wallets={connectors.map((item) => {
+        const detected = item.isReady();
+        const downloadUrl = item.metadata.downloadUrl?.trim();
+        return {
+          id: item.metadata.id,
+          name: item.metadata.name,
+          icon: item.metadata.icon,
+          description: item.metadata.name,
+          detected,
+          installUrl: detected ? undefined : downloadUrl || undefined,
+        };
+      })}
+      connectingId={connectingId}
+      elevated
+      onSelect={(wallet) => {
+        setPickerOpen(false);
+        setConnectingId(wallet.id);
+        void connectConnector(wallet.id)
+          .catch((error: unknown) => {
+            console.error("Bitcoin wallet connect failed", error);
+          })
+          .finally(() => setConnectingId(null));
+      }}
+    />
+  );
 };

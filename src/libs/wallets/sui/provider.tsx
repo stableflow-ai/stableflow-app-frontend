@@ -4,7 +4,7 @@ import useWalletsStore from "@/stores/use-wallets";
 import useBalancesStore from "@/stores/use-balances";
 import { useDebounceFn } from "ahooks";
 import { useWalletSelector } from "../hooks/use-wallet-selector";
-import WalletSelector from "../components/wallet-selector";
+import WalletSelector, { type WalletSelectorItem } from "../components/wallet-selector";
 import { SUI_DAPP_KIT_STORAGE_KEY, suiDAppKit } from "./dapp-kit";
 
 import {
@@ -76,21 +76,31 @@ const Content = () => {
     });
   }, [wallets]);
 
-  const [installedWallets, uninstalledWallets] = useMemo(() => {
-    const _installedWallets = [];
-    const _uninstalledWallets = [];
-    for (const _wallet of AllWallets) {
-      const installedWallet = wallets.find((__wallet) => __wallet.name === _wallet.name);
+  const [selectorWallets, walletByKey] = useMemo(() => {
+    const items: WalletSelectorItem[] = [];
+    const byKey = new Map<string, (typeof wallets)[number]>();
+    for (const preset of AllWallets) {
+      const installedWallet = wallets.find((wallet) => wallet.name === preset.name);
       if (installedWallet) {
-        _installedWallets.push({
-          ...installedWallet,
-          readyState: "Installed",
+        byKey.set(installedWallet.name, installedWallet);
+        items.push({
+          key: installedWallet.name,
+          name: installedWallet.name,
+          icon: typeof installedWallet.icon === "string" ? installedWallet.icon : preset.icon,
+          url: preset.url,
+          detected: true,
         });
         continue;
       }
-      _uninstalledWallets.push(_wallet);
+      items.push({
+        key: preset.name,
+        name: preset.name,
+        icon: preset.icon,
+        url: preset.url,
+        detected: false,
+      });
     }
-    return [_installedWallets, _uninstalledWallets];
+    return [items, byKey] as const;
   }, [wallets]);
 
   const setBalancesStore = useBalancesStore((state) => state.set);
@@ -103,8 +113,8 @@ const Content = () => {
     onConnect,
     isConnecting,
   } = useWalletSelector({
-    connect: async (wallet: any) => {
-      const connector = wallets.find((w) => w.name === wallet.name);
+    connect: async (key: string) => {
+      const connector = walletByKey.get(key);
       if (!connector) {
         return;
       }
@@ -173,8 +183,7 @@ const Content = () => {
       onClose={onClose}
       onConnect={onConnect}
       isConnecting={isConnecting}
-      wallets={[...installedWallets, ...uninstalledWallets]}
-      readyState={{ key: "readyState", value: "Installed" }}
+      wallets={selectorWallets}
       title="Select Sui Wallet"
     />
   );
