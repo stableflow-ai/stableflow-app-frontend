@@ -1,3 +1,4 @@
+import useBalancesStore from "@/stores/use-balances";
 import useWalletsStore from "@/stores/use-wallets";
 import { TonConnectUIProvider, useTonAddress, useTonWallet, useTonConnectUI } from "@tonconnect/ui-react";
 import { useEffect, useState } from "react";
@@ -22,6 +23,7 @@ const WalletProvider = (props: any) => {
   const { children } = props;
 
   const setWallets = useWalletsStore((state) => state.set);
+  const setBalancesStore = useBalancesStore((state) => state.set);
 
   const wallet = useTonWallet();
   const [tonConnectUI] = useTonConnectUI();
@@ -35,6 +37,9 @@ const WalletProvider = (props: any) => {
       tonConnectUI,
       account: userFriendlyAddress,
     });
+    if (!userFriendlyAddress) {
+      setBalancesStore({ tonBalances: {} });
+    }
     setWallets({
       ton: {
         account: userFriendlyAddress || null,
@@ -48,6 +53,7 @@ const WalletProvider = (props: any) => {
         },
         disconnect: () => {
           tonConnectUI.disconnect();
+          setBalancesStore({ tonBalances: {} });
           setWallets({
             ton: {
               account: null,
