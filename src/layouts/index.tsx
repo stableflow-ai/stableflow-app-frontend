@@ -1,9 +1,10 @@
 import { Outlet, useLocation } from "react-router-dom";
-import { lazy, Suspense, useRef } from "react";
+import { lazy, Suspense, useRef, type ReactNode } from "react";
 import UserActions from "./user-actions";
 import LayoutContext from "./context";
 import useWalletBalances from "@/all-tokens/hooks/use-wallet-balances";
 import { isBridgePath, isHistoryPath, useIsAllTokens } from "@/all-tokens/route-mode";
+import AllTokensPayWidgetsRoot from "@/all-tokens/pay-widgets-root";
 
 // import useUpdateTxns from "@/hooks/use-update-txns";
 // import SupportButton from "@/components/support-button";
@@ -33,6 +34,10 @@ export default function Layout() {
 
   // useUpdateTxns();
 
+  const frame = (children: ReactNode) => (
+    allTokensEnabled ? <AllTokensPayWidgetsRoot>{children}</AllTokensPayWidgetsRoot> : children
+  );
+
   return (
     <LayoutContext.Provider
       value={{
@@ -57,6 +62,8 @@ export default function Layout() {
 
         {/* Content Layer */}
         <div ref={containerRef} className="relative z-10 w-full h-full overflow-y-auto">
+          {frame(
+            <>
           <Suspense fallback={<LoadingSpinner />}>
             <UserActions />
           </Suspense>
@@ -65,6 +72,8 @@ export default function Layout() {
           <Suspense fallback={<LoadingSpinner />}>
             {allTokensEnabled ? <AllTokensWallet /> : <Wallet />}
           </Suspense>
+            </>,
+          )}
 
           {
             isFooter2 ? (
