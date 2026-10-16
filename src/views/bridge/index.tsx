@@ -13,6 +13,7 @@ const Networks = lazy(() => import("./components/networks"));
 const BridgeButton = lazy(() => import("./components/button"));
 const HistoryDrawer = lazy(() => import("../history/drawer"));
 const PendingTransfer = lazy(() => import("./components/pending"));
+const PrivatePayBanner = lazy(() => import("./components/private-pay-banner"));
 
 // Loading component
 const LoadingSpinner = () => null;
@@ -65,6 +66,9 @@ export default function Bridge() {
           ) : (
             <StablecoinBridge />
           )}
+          <Suspense fallback={null}>
+            <PrivatePayBanner />
+          </Suspense>
         </div>
       </div>
       <Suspense fallback={null}>
