@@ -1,16 +1,25 @@
 import { useState } from "react";
 
-export function useWalletSelector(props: any) {
-  const {
-    connect,
-  } = props;
+function connectionKey(wallet: unknown): string | null {
+  if (typeof wallet === "string") return wallet;
+  if (!wallet || typeof wallet !== "object") return null;
+  const record = wallet as { key?: unknown; name?: unknown };
+  const key = record.key ?? record.name;
+  if (typeof key === "string") return key;
+  if (key == null) return null;
+  return String(key);
+}
 
-  // Wallet selector
-  const [open, setOpen] = useState<boolean>(false);
+export function useWalletSelector(props: {
+  connect?: (wallet: any) => unknown;
+}) {
+  const { connect } = props;
+
+  const [open, setOpen] = useState(false);
   const [isConnecting, setIsConnecting] = useState<string | null>(null);
   const onConnect = async (wallet: any) => {
     try {
-      setIsConnecting(wallet);
+      setIsConnecting(connectionKey(wallet));
       await connect?.(wallet);
       onClose();
     } catch (error) {

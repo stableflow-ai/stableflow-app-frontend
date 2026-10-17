@@ -13,6 +13,7 @@ import clsx from "clsx";
 import { menuItems } from "@/components/navigation-menu/menu-items";
 import { useTrack } from "@/hooks/use-track";
 import { getStableflowIcon, getStableflowLogo } from "@/utils/format/logo";
+import { WalletChainsButton } from "@stableflow/pay-widgets/wallet-chains-button";
 
 const Social = lazy(() => import("@/components/social"));
 const NavigationMenu = lazy(() => import("@/components/navigation-menu"));
@@ -412,6 +413,7 @@ const AccountButton = () => {
   const isMobile = useIsMobile();
   const { pathname } = useLocation();
   const mode = useRouteMode();
+  const allTokensEnabled = useIsAllTokens();
 
   const isHistory = useMemo(() => {
     return isHistoryPath(pathname);
@@ -422,35 +424,44 @@ const AccountButton = () => {
     return accounts.some((account) => !!account);
   }, [walletsStore]);
 
+  const openWallet = () => {
+    walletStore.set({ showWallet: true });
+  };
+
+  const historyButton = !isHistory && !isMobile ? (
+    <HistoryButton
+      onClick={() => {
+        addHistory({ type: "click" });
+        if (isMobile) {
+          historyStore.setOpenDrawer(!historyStore.openDrawer);
+          return;
+        }
+        navigate(MODE_ROUTES[mode].history);
+      }}
+    />
+  ) : null;
+
+  if (allTokensEnabled) {
+    return (
+      <div className="flex items-center gap-2">
+        {isConnected ? historyButton : null}
+        <WalletChainsButton onClick={openWallet} />
+      </div>
+    );
+  }
+
   return (
     !isConnected ? (
       <button
-        onClick={() => {
-          walletStore.set({ showWallet: true });
-        }}
+        onClick={openWallet}
         className="button h-9 px-[15px] bg-[#6284F5] rounded-[18px] shadow-[0_2px_6px_0_rgba(0,0,0,0.10)] text-[16px] font-medium leading-none text-white [font-feature-settings:'liga'_off,'clig'_off]"
       >
         Connect
       </button>
     ) : (
       <div className="flex items-center gap-2">
-        {!isHistory && !isMobile && (
-          <HistoryButton
-            onClick={() => {
-              addHistory({ type: "click" });
-              if (isMobile) {
-                historyStore.setOpenDrawer(!historyStore.openDrawer);
-                return;
-              }
-              navigate(MODE_ROUTES[mode].history);
-            }}
-          />
-        )}
-        <ChainsButton
-          onClick={() => {
-            walletStore.set({ showWallet: true });
-          }}
-        />
+        {historyButton}
+        <ChainsButton onClick={openWallet} />
       </div>
     )
   );

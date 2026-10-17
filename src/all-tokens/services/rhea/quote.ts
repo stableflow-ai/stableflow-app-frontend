@@ -228,6 +228,7 @@ export type QuoteParams = {
 };
 
 export async function rheaQuote(params: QuoteParams) {
+  // Rhea does not support passing this parameter; their backend sets the fee basis points and fee address directly in the JWT.
   const appFees = buildAppFees({
     fromToken: params.fromToken,
     toToken: params.toToken,
@@ -247,7 +248,7 @@ export async function rheaQuote(params: QuoteParams) {
       sameChainTimeoutMs: 1500,
       crossChainTimeoutMs: 6000,
       ...(params.recipient ? { recipient: params.recipient } : {}),
-      ...(appFees ? { appFees } : {}),
+      // ...(appFees ? { appFees } : {}),
     }),
   });
 

@@ -1,5 +1,6 @@
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { NearConnector, type NearWalletBase } from "@hot-labs/near-connect";
+import { WalletSelectDialog } from "@stableflow/pay-widgets/wallet-select";
 import SignClient from "@walletconnect/sign-client";
 import useWalletsStore from "@/stores/use-wallets";
 import useBalancesStore from "@/stores/use-balances";
@@ -21,6 +22,16 @@ const NEAR_CONNECT_WALLET_ID_SET = new Set<string>(NEAR_CONNECT_WALLET_IDS);
 
 const projectId = import.meta.env.VITE_RAINBOW_PROJECT_ID as string;
 
+function nearWalletWebsiteHost(website: string | undefined) {
+  const value = website?.trim();
+  if (!value) return undefined;
+  try {
+    return new URL(value).hostname || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function applyNearConnectWalletAllowlist(connector: NearConnector) {
   connector.manifest.wallets = connector.manifest.wallets.filter((wallet) =>
     NEAR_CONNECT_WALLET_ID_SET.has(wallet.id)
@@ -37,6 +48,10 @@ export default function NEARProvider({
 }) {
   const setWallets = useWalletsStore((state) => state.set);
   const setBalances = useBalancesStore((state) => state.set);
+  const connectorRef = useRef<NearConnector | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [manifestReady, setManifestReady] = useState(false);
+  const [walletList, setWalletList] = useState<NearWalletBase[]>([]);
 
   useEffect(() => {
     let disposed = false;
@@ -60,7 +75,7 @@ export default function NEARProvider({
           walletIcon: wallet?.manifest?.icon,
           walletName: wallet?.manifest?.name,
           connect: () => {
-            void connector.connect();
+            setPickerOpen(true);
           },
           disconnect: async () => {
             await connector.disconnect();
@@ -85,6 +100,7 @@ export default function NEARProvider({
 
     const onWalletsChanged = () => {
       applyNearConnectWalletAllowlist(connector);
+      setWalletList(connector.availableWallets);
     };
 
     connector.on("wallet:signIn", onSignIn);
@@ -97,6 +113,9 @@ export default function NEARProvider({
     void (async () => {
       await connector.whenManifestLoaded;
       applyNearConnectWalletAllowlist(connector);
+      connectorRef.current = connector;
+      setWalletList(connector.availableWallets);
+      setManifestReady(true);
       try {
         const connected = await connector.getConnectedWallet();
         if (disposed) return;
@@ -109,6 +128,7 @@ export default function NEARProvider({
 
     return () => {
       disposed = true;
+      connectorRef.current = null;
       connector.off("wallet:signIn", onSignIn);
       connector.off("wallet:signOut", onSignOut);
       connector.off("selector:manifestUpdated", onWalletsChanged);
@@ -116,5 +136,30 @@ export default function NEARProvider({
     };
   }, [setBalances, setWallets]);
 
-  return children;
+  return (
+    <>
+      {children}
+      <WalletSelectDialog
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        title="Select NEAR Wallet"
+        wallets={walletList.map((wallet) => ({
+          id: wallet.manifest.id,
+          name: wallet.manifest.name,
+          icon: wallet.manifest.icon,
+          description: nearWalletWebsiteHost(wallet.manifest.website),
+        }))}
+        loading={!manifestReady}
+        elevated
+        onSelect={(wallet) => {
+          setPickerOpen(false);
+          const connector = connectorRef.current;
+          if (!connector) return;
+          void connector.connect({ walletId: wallet.id }).catch((error: unknown) => {
+            console.error("Near wallet connect failed", error);
+          });
+        }}
+      />
+    </>
+  );
 }

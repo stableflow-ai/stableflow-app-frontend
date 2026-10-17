@@ -24,7 +24,8 @@ export default function Address({ type = "evm" }: { type: WalletType }) {
         </div>
         <div className="flex items-center pl-[4px]">
           <CopyButton
-            onClick={() => {
+            onClick={(ev: any) => {
+              ev.stopPropagation();
               wallet.account && onCopy(wallet.account);
             }}
           />
