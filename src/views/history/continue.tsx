@@ -331,7 +331,7 @@ const ContinueTransfer = (props: any) => {
           destination_caller: cctpSendParam?.[5]?.toString(),
           max_fee: cctpSendParam?.[6]?.toString(),
           finality_threshold: cctpSendParam?.[7]?.toString(),
-          receipt_address: history.receive_address,
+          receipt_address: evmWallet.account,
         };
       }
 

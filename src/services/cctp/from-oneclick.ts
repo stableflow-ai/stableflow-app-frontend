@@ -111,7 +111,7 @@ export class OneClickCCTPService {
         destination_caller: cctpSendParam?.[5]?.toString(),
         max_fee: cctpSendParam?.[6]?.toString(),
         finality_threshold: cctpSendParam?.[7]?.toString(),
-        receipt_address: params.recipient,
+        receipt_address: destinationRecipientAddress,
         source_domain: cctpResult.quoteParam?.sourceDomain,
         destination_domain_id: cctpResult.quoteParam?.destinationDomain,
       },
