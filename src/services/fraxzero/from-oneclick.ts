@@ -226,6 +226,11 @@ export class OneClick2FraxZeroService extends FraxZeroService {
           isToEthereumFrxUSD,
         },
         sourceQuoteParams: params,
+        // Record the middle-chain address only when OneClick delivers there. There is no second-hop refundTo when the destination is already Ethereum frxUSD.
+        executionAddresses: {
+          recipients: [middleChainRecipientAddress],
+          refundTos: isToEthereumFrxUSD ? [] : [middleChainRecipientAddress],
+        },
       };
     }
 
@@ -261,6 +266,11 @@ export class OneClick2FraxZeroService extends FraxZeroService {
           isToEthereumFrxUSD,
         },
         sourceQuoteParams: params,
+        // Source is already Ethereum USDC, so funds are not sent to the default middle-chain address.
+        executionAddresses: {
+          recipients: [],
+          refundTos: [],
+        },
       };
     }
 
@@ -340,6 +350,11 @@ export class OneClick2FraxZeroService extends FraxZeroService {
         isToEthereumFrxUSD,
       },
       sourceQuoteParams: params,
+      // Source is already Ethereum USDC and calls mintAndSend directly, so do not record the default middle-chain address.
+      executionAddresses: {
+        recipients: [],
+        refundTos: [],
+      },
     };
   }
 

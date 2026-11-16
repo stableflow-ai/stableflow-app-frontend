@@ -43,7 +43,8 @@ export class OneClickCCTPService {
       amountWei: secondStepAmountWei,
       fromToken: MIDDLE_TOKEN_CHAIN,
       originChain: MIDDLE_TOKEN_CHAIN.chainName,
-      refundTo: MIDDLE_CHAIN_REFUND_ADDRESS,
+      // CCTP refundTo matches the Near Intents recipient: the connected EVM wallet, or the default address when it is not connected.
+      refundTo: destinationRecipientAddress,
       wallet: middleChainWallet,
     };
 
@@ -129,6 +130,11 @@ export class OneClickCCTPService {
       cctpSendParam,
       routeDisabled: routeStatus.disabled,
       sourceQuoteParams: params,
+      // Near Intents recipient and the refundTo actually submitted to CCTP.
+      executionAddresses: {
+        recipients: [destinationRecipientAddress],
+        refundTos: [cctpParams.refundTo],
+      },
     };
   }
 

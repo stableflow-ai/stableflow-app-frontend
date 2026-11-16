@@ -173,6 +173,11 @@ export class OneClickUsdt0Service {
       usdt0MessageFee,
       routeDisabled: routeStatus.disabled,
       sourceQuoteParams: params,
+      // Near Intents recipient and the refundTo actually submitted to the second-hop USDT0 quote.
+      executionAddresses: {
+        recipients: [middleChainRecipientAddress],
+        refundTos: [usdt0Params.refundTo],
+      },
     };
   }
 
