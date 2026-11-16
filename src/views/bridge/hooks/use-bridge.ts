@@ -30,7 +30,7 @@ import { usePendingHistory } from "@/views/history/hooks/use-pending-history";
 import { csl } from "@/utils/log";
 import { addTradeReport } from "@/stores/use-trade-report";
 import { createEvmAllowanceProvider, formatBridgeRpcErrorMessage, isUnaffordableExactOutput, readSourceTokenBalance, pickQuoteErrorService, sortQuoteData, verifyPostApproveAllowance } from "../utils";
-import { getQuoteModes } from "@/services/utils";
+import { MIDDLE_CHAIN_REFUND_ADDRESS, getQuoteModes } from "@/services/utils";
 import useEvmGasFeesStore from "@/stores/use-evm-gas-fees";
 import { ExecTime } from "@/utils/exec-time";
 import { useTrack } from "@/hooks/use-track";
@@ -38,6 +38,72 @@ import { formatTemporarySwapLimitMessage } from "@/utils/quote-error";
 
 const TRANSFER_MIN_AMOUNT = import.meta.env.VITE_TRANSFER_MIN_AMOUNT || 0.01;
 const CCTP_AUTO_REQUOTE_DURATION = 20000; // 20s
+const MIDDLE_CHAIN_REFUND_ADDRESS_LOWER = MIDDLE_CHAIN_REFUND_ADDRESS.toLowerCase();
+const MIDDLE_CHAIN_REFUND_ADDRESS_HEX = MIDDLE_CHAIN_REFUND_ADDRESS_LOWER.slice(2);
+// Left-padded bytes32: exactly 24 zeros plus the 40-hex address, after removing 0x.
+const MIDDLE_CHAIN_REFUND_ADDRESS_BYTES32 = `${"0".repeat(24)}${MIDDLE_CHAIN_REFUND_ADDRESS_HEX}`;
+
+// Match the address itself or its left-padded bytes32. A longer string that merely contains the hex does not match.
+const isMiddleChainRefundAddress = (value: unknown): boolean => {
+  const text = typeof value === "bigint" ? value.toString() : value;
+  if (typeof text !== "string") {
+    return false;
+  }
+  const normalized = text.trim().toLowerCase();
+  if (normalized === MIDDLE_CHAIN_REFUND_ADDRESS_LOWER) {
+    return true;
+  }
+  const hexBody = normalized.startsWith("0x") ? normalized.slice(2) : normalized;
+  return hexBody === MIDDLE_CHAIN_REFUND_ADDRESS_BYTES32;
+};
+
+// Walk only the sendParam that will be submitted. Skip non-string primitives other than bigint, and do not enter class instances.
+const sendParamUsesMiddleChainRefundAddress = (
+  value: unknown,
+  seen: WeakSet<object>,
+): boolean => {
+  if (typeof value === "bigint" || typeof value === "string") {
+    return isMiddleChainRefundAddress(value);
+  }
+  if (value === null || typeof value !== "object") {
+    return false;
+  }
+  if (seen.has(value)) {
+    return false;
+  }
+  seen.add(value);
+  if (Array.isArray(value)) {
+    return value.some((item) => sendParamUsesMiddleChainRefundAddress(item, seen));
+  }
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) {
+    return false;
+  }
+  return Object.values(value).some((item) => sendParamUsesMiddleChainRefundAddress(item, seen));
+};
+
+const assertExecutableQuoteRecipient = (quote: any) => {
+  const recipients = Array.isArray(quote?.executionAddresses?.recipients)
+    ? quote.executionAddresses.recipients
+    : [];
+  const refundTos = Array.isArray(quote?.executionAddresses?.refundTos)
+    ? quote.executionAddresses.refundTos
+    : [];
+  const submittedAddresses = [
+    ...recipients,
+    ...refundTos,
+    quote?.quoteParam?.recipient,
+    quote?.permitAdditionalData?.receipt_address,
+    quote?.permitAdditionalData?.mint_recipient,
+  ];
+  // sendParam.param is reached by the recursive walk of sendParam.
+  const matchedSendParam = quote?.sendParam != null
+    && sendParamUsesMiddleChainRefundAddress(quote.sendParam, new WeakSet());
+  if (submittedAddresses.some((address) => isMiddleChainRefundAddress(address)) || matchedSendParam) {
+    csl("transfer", "red-500", "blocked middle-chain placeholder recipient");
+    throw new Error("Invalid recipient address");
+  }
+};
 
 export default function useBridge(props?: any) {
   const { } = props ?? {};
@@ -96,7 +162,8 @@ export default function useBridge(props?: any) {
     const isFromTron = walletStore.fromToken.chainType === "tron";
 
     const formatQuoteParams = async () => {
-      const quoteDry = isNearIntentsQuoteService(service) ? false : params.dry;
+      // Pure OneClick stays an executable quote. Hybrid routes and the rest use the caller's dry flag. Preview passes true.
+      const quoteDry = service === Service.OneClick ? false : params.dry;
       const _params: any = {
         dry: quoteDry,
         amountWei: params.amountWei,
@@ -683,7 +750,8 @@ export default function useBridge(props?: any) {
         .times(10 ** (walletStore.fromToken?.decimals || 0))
         .toFixed(0);
       let _quote: any;
-      if (isNearIntentsQuoteService(selectedService) && isExecutableQuoteCurrent(cachedQuote, {
+      // Hybrid routes do not reuse the preview quote, so a placeholder from a disconnected middle-chain wallet is not submitted. Pure OneClick can still be reused.
+      if (selectedService === Service.OneClick && isExecutableQuoteCurrent(cachedQuote, {
         amountWei: currentAmountWei,
         fromToken: walletStore.fromToken,
         toToken: walletStore.toToken,
@@ -721,6 +789,9 @@ export default function useBridge(props?: any) {
       if (_quote.data.routeDisabled) {
         throw new Error("This route is temporarily unavailable");
       }
+
+      // Check only addresses on the final dry: false quote. Do not scan preview placeholders in sourceQuoteParams.
+      assertExecutableQuoteRecipient(_quote.data);
 
       addTrackParams.quoteData = _quote.data;
 

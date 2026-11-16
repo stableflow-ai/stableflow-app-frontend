@@ -198,6 +198,11 @@ export class FraxZero2OneClickService extends FraxZeroService {
         priceImpact: numberRemoveEndZero(Big(priceImpact).toFixed(4)),
         exchangeRate: numberRemoveEndZero(Big(exchangeRate).toFixed(6, Big.roundDown)),
         quoteDeadline: thirdStepResult?.quoteDeadline,
+        // Real first-hop recipient and the refundTo sent to Near Intents. Leave both empty when the source is already Ethereum frxUSD.
+        executionAddresses: {
+          recipients: !isFromEthereumFrxUSD ? [middleChainRecipientAddress] : [],
+          refundTos: !isToEthereumUSDC ? [middleChainRecipientAddress] : [],
+        },
         quoteParam: {
           ..._result?.quoteParam,
           fromToken,

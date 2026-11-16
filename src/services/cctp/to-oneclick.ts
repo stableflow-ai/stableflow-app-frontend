@@ -36,6 +36,7 @@ export class CCTPOneClickService {
       ...params,
       toToken: MIDDLE_TOKEN_CHAIN,
       destinationChain: MIDDLE_TOKEN_CHAIN.chainName,
+      // The first-hop recipient is a placeholder while dry. Replace it with the deposit address when not dry.
       recipient: refundTo,
     };
     const oneClickParams = {
@@ -117,6 +118,11 @@ export class CCTPOneClickService {
       },
       routeDisabled: routeStatus.disabled,
       sourceQuoteParams: params,
+      // Do not record the placeholder. Record the deposit address only when not dry. refundTo is the address sent to Near Intents.
+      executionAddresses: {
+        recipients: !dry && oneClickResult.quote?.depositAddress ? [oneClickResult.quote.depositAddress] : [],
+        refundTos: [oneClickParams.refundTo],
+      },
     };
   }
 

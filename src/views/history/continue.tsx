@@ -30,6 +30,23 @@ import { useConfigStore } from "@/stores/use-config";
 import { useTrack } from "@/hooks/use-track";
 import { addTradeReport } from "@/stores/use-trade-report";
 
+// Reject the default middle-chain address, including its left-padded bytes32 form, before a continue permit is written.
+const isDefaultMiddleChainAddress = (value: unknown) => {
+  if (typeof value !== "string" || !value.trim()) {
+    return false;
+  }
+  const normalized = value.trim().toLowerCase().replace(/^0x/, "");
+  const defaultHex = MIDDLE_CHAIN_REFUND_ADDRESS.slice(2).toLowerCase();
+  // Plain address, or a left-padded bytes32 whose last 40 hex chars are that address.
+  return normalized === defaultHex || normalized === `000000000000000000000000${defaultHex}`;
+};
+
+const assertPermitAddresses = (...addresses: unknown[]) => {
+  if (addresses.some((address) => isDefaultMiddleChainAddress(address))) {
+    throw new Error("Invalid recipient address");
+  }
+};
+
 const ContinueTransfer = (props: any) => {
   const { history, reload } = props;
 
@@ -175,6 +192,10 @@ const ContinueTransfer = (props: any) => {
       };
       let permitResult;
       if (isFromOneClickHybridProject) {
+        // Require a connected EVM wallet before switching chains or signing. A null wallet throws a different error.
+        if (!evmWallet?.account || !evmWallet?.wallet) {
+          throw new Error("Permit wallet not connected");
+        }
         _formatQuoteDataParams.swapType = OneClickSwapType.Output;
         _formatQuoteDataParams.amountWei = quote.amountIn;
         _formatQuoteDataParams.recipient = evmWallet.account;
@@ -266,6 +287,9 @@ const ContinueTransfer = (props: any) => {
       };
 
       if (isOneClickUsdt0) {
+        if (!evmWallet?.account) {
+          throw new Error("Permit wallet not connected");
+        }
         // second step quote
         // is from USDT(MIDDLE_TOKEN_CHAIN) on the Arbitrum chain to sourceToToken
         const usdt0Result = await usdt0Service.quote({
@@ -275,7 +299,7 @@ const ContinueTransfer = (props: any) => {
           originChain: USDT0_MIDDLE_TOKEN_CHAIN.chainName,
           destinationChain: sourceToToken?.chainName,
           amountWei: quote.amountOut,
-          refundTo: MIDDLE_CHAIN_REFUND_ADDRESS,
+          refundTo: evmWallet.account,
           recipient: history.receive_address,
           slippageTolerance: configStore.slippage,
           prices,
@@ -287,6 +311,16 @@ const ContinueTransfer = (props: any) => {
 
         const usdt0SendParam = usdt0Result.sendParam?.param?.[0];
         const usdt0MessageFee = usdt0Result.sendParam?.param?.[1];
+
+        // Reject the default middle-chain address before writing the permit.
+        assertPermitAddresses(
+          usdt0Result.quoteParam?.recipient,
+          usdt0Result.quoteParam?.refundTo,
+          usdt0Result.sourceQuoteParams?.recipient,
+          usdt0Result.sourceQuoteParams?.refundTo,
+          usdt0SendParam?.to,
+          usdt0Result.sendParam?.param?.[2],
+        );
 
         reportData.layer_zero_permit = {
           ...permitResult,
@@ -302,6 +336,9 @@ const ContinueTransfer = (props: any) => {
       }
 
       if (isOneClickCCTP) {
+        if (!evmWallet?.account) {
+          throw new Error("Permit wallet not connected");
+        }
         const cctpResult = await cctpService.quote({
           wallet: evmWallet.wallet,
           fromToken: CCTP_MIDDLE_TOKEN_CHAIN,
@@ -309,7 +346,7 @@ const ContinueTransfer = (props: any) => {
           originChain: CCTP_MIDDLE_TOKEN_CHAIN.chainName,
           destinationChain: sourceToToken?.chainName,
           amountWei: quote.amountOut,
-          refundTo: MIDDLE_CHAIN_REFUND_ADDRESS,
+          refundTo: evmWallet.account,
           recipient: history.receive_address,
           slippageTolerance: configStore.slippage,
           prices,
@@ -320,6 +357,15 @@ const ContinueTransfer = (props: any) => {
         }
 
         const cctpSendParam = cctpResult.sendParam?.param;
+
+        // Reject the default middle-chain address, including its bytes32 form, before writing the permit.
+        assertPermitAddresses(
+          cctpResult.quoteParam?.recipient,
+          cctpResult.quoteParam?.refundTo,
+          cctpResult.sourceQuoteParams?.recipient,
+          cctpResult.sourceQuoteParams?.refundTo,
+          cctpSendParam?.[3],
+        );
 
         reportData.cctp_permit = {
           ...permitResult,
