@@ -39,6 +39,7 @@ export class Usdt0OneClickService {
       ...params,
       toToken: USDT0_MIDDLE_TOKEN_CHAIN,
       destinationChain: USDT0_MIDDLE_TOKEN_CHAIN.chainName,
+      // Placeholder while dry. Replace it with the deposit address when not dry. Do not use the user wallet or the funds miss the deposit.
       recipient: MIDDLE_CHAIN_REFUND_ADDRESS,
     };
     const oneClickParams = {
@@ -120,6 +121,11 @@ export class Usdt0OneClickService {
       },
       routeDisabled: routeStatus.disabled,
       sourceQuoteParams: params,
+      // Do not record the placeholder. Record the deposit address only when not dry. refundTo is the address sent to Near Intents.
+      executionAddresses: {
+        recipients: !dry && oneClickResult.quote?.depositAddress ? [oneClickResult.quote.depositAddress] : [],
+        refundTos: [oneClickParams.refundTo],
+      },
     };
   }
 
