@@ -12,7 +12,7 @@ const TokenSelectModal = lazy(() => import("./components/token-select-modal"));
 export default function AllTokensBridge() {
   useRheaTokens();
   usePendingHistory();
-  const { onTransfer, addressValidation, errorChain, onRefreshQuote } = useBridge();
+  const { onTransfer, addressValidation, errorChain, onRefreshQuote, recipientAddressEmpty } = useBridge();
   const [isRoutes, setIsRoutes] = useState(false);
 
   useEffect(() => {
@@ -39,6 +39,7 @@ export default function AllTokensBridge() {
           <BridgeButton
             onClick={onTransfer}
             errorChain={errorChain}
+            recipientAddressEmpty={recipientAddressEmpty}
           />
         </Suspense>
       </div>
