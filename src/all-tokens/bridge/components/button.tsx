@@ -11,10 +11,12 @@ import { useSwitchChain } from "wagmi";
 export default function BridgeButton({
   onClick,
   errorChain,
+  recipientAddressEmpty,
 }: {
   onClick: () => void;
   onQuote?: (params: { dry: boolean }, isSync?: boolean) => void;
   errorChain: number;
+  recipientAddressEmpty: boolean;
 }) {
   const bridgeStore = useBridgeStore();
   const toast = useToast();
@@ -37,18 +39,28 @@ export default function BridgeButton({
     if (errorConnect) {
       return `Connect to ${walletStore.fromToken?.chainName ?? "Wallet"}`;
     }
-    if (bridgeStore.errorTips) {
-      return bridgeStore.errorTips;
-    }
     if (errorChain) {
       return "Switch Network";
     }
+    if (recipientAddressEmpty) {
+      return "Recipient address is empty";
+    }
+    if (bridgeStore.errorTips) {
+      return bridgeStore.errorTips;
+    }
     return "Transfer";
-  }, [bridgeStore.errorTips, errorChain, errorConnect, walletStore.fromToken]);
+  }, [
+    bridgeStore.errorTips,
+    errorChain,
+    errorConnect,
+    recipientAddressEmpty,
+    walletStore.fromToken,
+  ]);
 
   const buttonDisabled = useMemo(() => {
     if (errorConnect || errorChain) return false;
     if (
+      recipientAddressEmpty ||
       !!bridgeStore.errorTips ||
       !bridgeStore.quoteDataService ||
       bridgeStore.quoteDataMap.size < 1 ||
@@ -61,6 +73,7 @@ export default function BridgeButton({
   }, [
     errorConnect,
     errorChain,
+    recipientAddressEmpty,
     bridgeStore.errorTips,
     loading,
     bridgeStore.quoteDataService,
@@ -68,17 +81,18 @@ export default function BridgeButton({
     bridgeStore.transferring,
   ]);
 
+  const buttonLoading = loading && !errorConnect && !errorChain;
+
   return (
     <Button
       disabled={buttonDisabled}
-      loading={loading}
+      loading={buttonLoading}
       className="w-full h-14 mt-4.5 rounded-xl bg-[#6284F5] shadow-[0_2px_6px_0_rgba(0,0,0,0.10)] text-white text-lg! font-medium!"
       onClick={async () => {
         if (errorConnect) {
           wallet?.connect?.();
           return;
         }
-        if (!!bridgeStore.errorTips) return;
         if (errorChain) {
           const chainId = Number(errorChain);
           const targetChain = Object.values(chains).find((chain) => Number(chain.chainId) === chainId);
@@ -107,6 +121,7 @@ export default function BridgeButton({
           }
           return;
         }
+        if (recipientAddressEmpty || !!bridgeStore.errorTips) return;
         onClick();
       }}
     >
