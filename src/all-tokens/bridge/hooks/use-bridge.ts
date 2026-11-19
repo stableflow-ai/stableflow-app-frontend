@@ -30,6 +30,11 @@ import type { RheaReportPayload } from "@/all-tokens/services/rhea/status";
 import { ZCASH_MANUAL_WALLET_NAME } from "@/all-tokens/wallets/zcash/wallet";
 
 const TRANSFER_MIN_AMOUNT = ALL_TOKENS_MIN_AMOUNT;
+const RECIPIENT_ADDRESS_EMPTY = "Recipient address is empty";
+
+const isDefaultRecipientAddress = (address?: string) => {
+  return !!address && Object.values(BridgeDefaultWallets).includes(address);
+};
 
 const toBaseUnits = (amount: string, decimals: number) => {
   try {
@@ -90,6 +95,11 @@ export default function useBridge(_props?: any) {
       bridgeStore.recipientAddress || _toWallet?.account || BridgeDefaultWallets[_toChainType];
     return [_fromWalletAddress, _toWalletAddress];
   }, [wallets, walletStore, bridgeStore.recipientAddress]);
+
+  const recipientAddressEmpty = useMemo(() => {
+    if (!walletStore.toToken) return false;
+    return isDefaultRecipientAddress(toWalletAddress);
+  }, [walletStore.toToken, toWalletAddress]);
 
   const [addressValidation, setAddressValidation] =
     useState<AddressValidationResult>({ isValid: false });
@@ -407,6 +417,11 @@ export default function useBridge(_props?: any) {
   };
 
   const onTransfer = async () => {
+    if (recipientAddressEmpty) {
+      bridgeStore.set({ errorTips: RECIPIENT_ADDRESS_EMPTY });
+      return;
+    }
+
     const addTrackParams: {
       type: "transfer_button";
       service: Service;
@@ -760,6 +775,7 @@ export default function useBridge(_props?: any) {
     onTransfer,
     onSelectQuote,
     onRefreshQuote,
+    recipientAddressEmpty,
     errorChain,
     setErrorChain,
     formatNumber,
